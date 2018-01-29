@@ -1317,9 +1317,28 @@ Fixpoint incr (b : bin) : bin :=
   match b with
   | Zero => TwicePlusOne Zero
   | Twice b => TwicePlusOne b
-  | TwicePlusOne Zero => 
-  | TwicePlusOne b => 
+  | TwicePlusOne b => Twice (incr b)
   end.
+
+Fixpoint bin_to_nat (b : bin) : nat :=
+  match b with
+  | Zero => 0
+  | Twice b => 2 * (bin_to_nat b)
+  | TwicePlusOne b => 1 + 2 * (bin_to_nat b)
+  end.
+
+Compute (incr(incr (incr Zero))).
+
+Example test_bin_incr1: (bin_to_nat (incr Zero)) = 1.
+Proof. simpl. reflexivity.  Qed.
+Example test_bin_incr2: (bin_to_nat (incr (incr Zero))) = 2.
+Proof. simpl. reflexivity.  Qed.
+Example test_bin_incr3: (bin_to_nat (incr(incr (incr Zero)))) = 3.
+Proof. simpl. reflexivity.  Qed.
+Example test_bin_incr4: (bin_to_nat (incr(incr(incr (incr Zero))))) = 4.
+Proof. simpl. reflexivity.  Qed.
+Example test_bin_incr5: (bin_to_nat (incr(incr(incr(incr (incr Zero)))))) = 5.
+Proof. simpl. reflexivity.  Qed.
 (** [] *)
 
 (** $Date: 2018-01-10 21:47:50 -0500 (Wed, 10 Jan 2018) $ *)
