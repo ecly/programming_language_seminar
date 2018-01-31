@@ -157,26 +157,44 @@ Proof.
 Theorem mult_0_r : forall n:nat,
   n * 0 = 0.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(* GRADE_THEOREM 0.5: mult_0_r *)
+    intros n. induction n as [| n' IHn'].
+    - simpl. reflexivity.
+    - simpl. rewrite -> IHn'. reflexivity.  
+Qed.
 
 Theorem plus_n_Sm : forall n m : nat,
   S (n + m) = n + (S m).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(* GRADE_THEOREM 0.5: plus_n_Sm *)
-
+    induction n, m.
+    - simpl. reflexivity.
+    - simpl. reflexivity.
+    - simpl. rewrite IHn. reflexivity.
+    - simpl. rewrite -> IHn. reflexivity.  
+Qed.
 
 Theorem plus_comm : forall n m : nat,
   n + m = m + n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+    induction n, m.
+    - reflexivity.
+    - rewrite <- plus_O_n. rewrite <- plus_n_O. reflexivity.
+    - simpl. rewrite IHn. reflexivity.
+    - simpl. rewrite IHn. rewrite plus_n_Sm. simpl. reflexivity. 
+Qed.
 (* GRADE_THEOREM 0.5: plus_comm *)
 
 Theorem plus_assoc : forall n m p : nat,
   n + (m + p) = (n + m) + p.
 Proof.
-  (* FILL IN HERE *) Admitted.
+    induction n, m.
+    - reflexivity. 
+    - reflexivity.
+    - simpl. rewrite <- plus_n_O. reflexivity.
+    - induction p. 
+    + simpl. rewrite <- IHn. reflexivity.
+    + simpl. rewrite <- IHn. reflexivity.
+ Qed.
+
 (* GRADE_THEOREM 0.5: plus_assoc *)
 (** [] *)
 
@@ -193,7 +211,11 @@ Fixpoint double (n:nat) :=
 
 Lemma double_plus : forall n, double n = n + n .
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction n.
+  - reflexivity.
+  - simpl. rewrite <- plus_n_Sm. rewrite <- IHn.
+   reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (evenb_S)  *)
