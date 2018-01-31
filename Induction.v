@@ -236,7 +236,8 @@ Proof.
 (** Briefly explain the difference between the tactics [destruct]
     and [induction].
 
-(* FILL IN HERE *)
+(* destruct is basically exactly the same as induction, with the only
+   difference being the lack of an induction hypothesis. *)
 *)
 (** [] *)
 
@@ -446,8 +447,23 @@ Proof.
 
     Theorem: [true = beq_nat n n] for any [n].
 
-    Proof: (* FILL IN HERE *)
-*)
+    _Proof_: By induction on [n].
+
+    - First, suppose [n = 0].  We must show
+
+        beq_nat 0 0 = true
+
+      This follows directly from the definition of beq_nat.
+
+    - Next, suppose [n = S n'], where
+
+        beq_nat n' n' = true
+
+      We must show
+
+        beq_nat (S n') (S n') = true
+
+      which is immediate from the induction hypothesis.  _Qed_. *)
 (** [] *)
 
 (* ################################################################# *)
@@ -460,7 +476,11 @@ Proof.
 Theorem plus_swap : forall n m p : nat,
   n + (m + p) = m + (n + p).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros n m p.
+  rewrite plus_assoc. rewrite plus_assoc.
+  assert (H: n + m = m + n).
+  { rewrite -> plus_comm. reflexivity. }
+  rewrite -> H. reflexivity. Qed.
 
 (** Now prove commutativity of multiplication.  (You will probably
     need to define and prove a separate subsidiary theorem to be used
