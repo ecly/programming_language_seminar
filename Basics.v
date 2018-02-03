@@ -886,12 +886,8 @@ Proof.
     as in the example below, Coq tries to instantiate them
     by matching with the current goal. *)
 
-Theorem mult_0_plus : forall n m : nat,
-  (0 + n) * m = n * m.
-Proof.
-  intros n m.
-  rewrite -> plus_O_n.
-  reflexivity.  Qed.
+
+
 
 (** **** Exercise: 2 stars (mult_S_1)  *)
 Theorem mult_S_1 : forall n m : nat,

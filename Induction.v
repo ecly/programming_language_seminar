@@ -486,11 +486,27 @@ Proof.
     need to define and prove a separate subsidiary theorem to be used
     in the proof of this one.  You may find that [plus_swap] comes in
     handy.) *)
-
+(** 
+Very close to:
+https://stackoverflow.com/questions/34758527/proving-that-multiplication-is-commutative,
+since I had to look for help online as I was struggling so much with this one.
+*)
 Theorem mult_comm : forall m n : nat,
   m * n = n * m.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction m.
+    - induction n.
+      + reflexivity.
+      + simpl. rewrite <- IHn. reflexivity.
+    - induction n.
+        + simpl. rewrite IHm. reflexivity.
+        + simpl. rewrite <- IHn.
+          rewrite -> IHm.
+          simpl. rewrite -> IHm.
+          repeat rewrite plus_assoc.
+          rewrite (plus_comm m n).
+          reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, optional (more_exercises)  *)
