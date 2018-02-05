@@ -259,19 +259,19 @@ Proof. simpl. reflexivity. Qed.
     [false]. *)
 
 Definition nandb (b1:bool) (b2:bool) : bool :=
-  match b1 with
-  | false => true
-  | true => negb b2
+  match (b1, b2) with
+  | (true, true) => false
+  | _ => true
   end.
 
 Example test_nandb1:               (nandb true false) = true.
-Proof. simpl. reflexivity.  Qed.
+Proof. reflexivity. Qed.
 Example test_nandb2:               (nandb false false) = true.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_nandb3:               (nandb false true) = true.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_nandb4:               (nandb true true) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 (** [] *)
 
 (** **** Exercise: 1 star (andb3)  *)
@@ -280,19 +280,19 @@ Proof. simpl. reflexivity.  Qed.
     otherwise. *)
 
 Definition andb3 (b1:bool) (b2:bool) (b3:bool) : bool :=
-  match b1 with
-  | true => andb b2 b3
-  | false => false
-  end.
+match (b1, b2, b3) with
+  | (true, true, true) => true
+  | _ => false
+end.
 
 Example test_andb31:                 (andb3 true true true) = true.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_andb32:                 (andb3 false true true) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_andb33:                 (andb3 true false true) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_andb34:                 (andb3 true true false) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -618,14 +618,14 @@ Fixpoint exp (base power : nat) : nat :=
 
 Fixpoint factorial (n:nat) : nat :=
   match n with
-    | O => 1
-    | S n' => mult (S n') (factorial n')
+  | O => 1
+  | S p => mult n (factorial p)
   end.
 
 Example test_factorial1:          (factorial 3) = 6.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_factorial2:          (factorial 5) = (mult 10 12).
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 (** [] *)
 
 (** We can make numerical expressions a little easier to read and
@@ -700,17 +700,16 @@ Proof. simpl. reflexivity.  Qed.
     this one, define it in terms of a previously defined function. *)
 
 Definition blt_nat (n m : nat) : bool :=
-  match n with
-  | 0 => false
-  | n => beq_nat (S(n) - m) 0
+  match (n, m) with
+  | (n, m) => (leb n m) && negb(beq_nat n m)
   end.
 
 Example test_blt_nat1:             (blt_nat 2 2) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_blt_nat2:             (blt_nat 2 4) = true.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 Example test_blt_nat3:             (blt_nat 4 2) = false.
-Proof. simpl. reflexivity.  Qed.
+Proof. simpl. reflexivity. Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -733,7 +732,7 @@ Proof. simpl. reflexivity.  Qed.
 
 Theorem plus_O_n : forall n : nat, 0 + n = n.
 Proof.
-  intros n. simpl. reflexivity.  Qed.
+  intros n. simpl. reflexivity. Qed.
 
 (** (You may notice that the above statement looks different in
     the [.v] file in your IDE than it does in the HTML rendition in
@@ -862,11 +861,14 @@ Theorem plus_id_exercise : forall n m o : nat,
   n = m -> m = o -> n + m = m + o.
 Proof.
   intros n m o.
-  intros H.
   intros H1.
-  rewrite -> H.
-  rewrite <- H1.
-  reflexivity. Qed.
+  intros H2.
+  rewrite -> H1.
+  rewrite <- H2.
+  reflexivity.
+Qed.
+
+
 (** [] *)
 
 (** The [Admitted] command tells Coq that we want to skip trying
@@ -886,8 +888,12 @@ Proof.
     as in the example below, Coq tries to instantiate them
     by matching with the current goal. *)
 
-
-
+Theorem mult_0_plus : forall n m : nat,
+  (0 + n) * m = n * m.
+Proof.
+  intros n m.
+  rewrite -> plus_O_n.
+  reflexivity.  Qed.
 
 (** **** Exercise: 2 stars (mult_S_1)  *)
 Theorem mult_S_1 : forall n m : nat,
@@ -895,10 +901,11 @@ Theorem mult_S_1 : forall n m : nat,
   m * (1 + n) = m * m.
 Proof.
   intros n m.
-  simpl.
   intros H.
-  rewrite <- H.
-  reflexivity.  Qed.
+  rewrite -> plus_1_l.
+  rewrite H.
+  reflexivity.
+Qed.
 
   (* (N.b. This proof can actually be completed without using [rewrite],
      but please do use [rewrite] for the sake of the exercise.) *)
@@ -1112,25 +1119,24 @@ Qed.
 Theorem andb_true_elim2 : forall b c : bool,
   andb b c = true -> c = true.
 Proof.
-  intros b c H.
-  destruct b, c, H.
+  intros a b.
+  intros H.
+  destruct a, b, H.
   - reflexivity.
   - reflexivity.
   - reflexivity.
   - reflexivity.
-Qed.
+  Qed.
 (** [] *)
 
 (** **** Exercise: 1 star (zero_nbeq_plus_1)  *)
 Theorem zero_nbeq_plus_1 : forall n : nat,
   beq_nat 0 (n + 1) = false.
 Proof.
-  intros n.
-  destruct n.
+  intros [].
   - reflexivity.
   - reflexivity.
 Qed.
-
 (** [] *)
 
 (* ================================================================= *)
@@ -1226,8 +1232,9 @@ Theorem identity_fn_applied_twice :
   (forall (x : bool), f x = x) ->
   forall (b : bool), f (f b) = b.
 Proof.
-  intros f H b.
-  rewrite H. rewrite H.
+  intros f H x.
+  rewrite -> H.
+  rewrite -> H.
   reflexivity.
 Qed.
 
@@ -1237,11 +1244,11 @@ Qed.
 
 Theorem negation_fn_applied_twice :
   forall (f : bool -> bool),
-  (forall (x : bool), f x = negb x) ->
-  forall (b : bool), f (f b) = b.
+  (forall (x : bool), f x = negb x) -> forall (b : bool), f (f b) = b.
 Proof.
-  intros f H b.
-  rewrite H. rewrite H.
+  intros f H x.
+  rewrite -> H.
+  rewrite -> H.
   rewrite -> negb_involutive.
   reflexivity.
 Qed.
@@ -1309,32 +1316,47 @@ Inductive bin : Type :=
   | Twice : bin -> bin
   | TwicePlusOne : bin -> bin.
 
-Fixpoint incr (b : bin) : bin :=
-  match b with
-  | Zero => TwicePlusOne Zero
-  | Twice b => TwicePlusOne b
-  | TwicePlusOne b => Twice (incr b)
+Fixpoint incr (num: bin) :=
+  match num with
+    | Zero => TwicePlusOne(Zero)
+    | Twice p => TwicePlusOne p
+    | TwicePlusOne p => Twice (incr p)
   end.
 
-Fixpoint bin_to_nat (b : bin) : nat :=
-  match b with
-  | Zero => 0
-  | Twice b => 2 * (bin_to_nat b)
-  | TwicePlusOne b => 1 + 2 * (bin_to_nat b)
+Fixpoint bin_to_nat (num: bin) :=
+  match num with
+  | Zero => O
+  | Twice p => mult (bin_to_nat p) 2
+  | TwicePlusOne p => ((bin_to_nat p) * 2) + 1
   end.
 
-Compute (incr(incr (incr Zero))).
+Example test_bin_incr1: incr Zero = TwicePlusOne Zero.
+Proof. reflexivity. Qed.
+Example test_bin_incr2: incr (TwicePlusOne Zero) = Twice(TwicePlusOne Zero).
+Proof. reflexivity. Qed.
+Example test_bin_incr3: incr (Twice(TwicePlusOne Zero)) 
+  = TwicePlusOne(TwicePlusOne Zero).
+Proof. reflexivity. Qed.
+Example test_bin_incr4: incr (TwicePlusOne(TwicePlusOne Zero))
+  = Twice(Twice(TwicePlusOne Zero)).
+Proof. reflexivity. Qed.
+Example test_bin_incr5: incr (Twice(Twice(TwicePlusOne Zero))) 
+  = TwicePlusOne(Twice(TwicePlusOne Zero)).
+Proof. reflexivity. Qed.
 
-Example test_bin_incr1: (bin_to_nat (incr Zero)) = 1.
-Proof. simpl. reflexivity.  Qed.
-Example test_bin_incr2: (bin_to_nat (incr (incr Zero))) = 2.
-Proof. simpl. reflexivity.  Qed.
-Example test_bin_incr3: (bin_to_nat (incr(incr (incr Zero)))) = 3.
-Proof. simpl. reflexivity.  Qed.
-Example test_bin_incr4: (bin_to_nat (incr(incr(incr (incr Zero))))) = 4.
-Proof. simpl. reflexivity.  Qed.
-Example test_bin_incr5: (bin_to_nat (incr(incr(incr(incr (incr Zero)))))) = 5.
-Proof. simpl. reflexivity.  Qed.
+Example test_bin_to_nat1: bin_to_nat(Zero) = 0.
+Proof. reflexivity. Qed.
+Example test_bin_to_nat2: bin_to_nat(TwicePlusOne(Zero)) = 1.
+Proof. reflexivity. Qed.
+Example test_bin_to_nat3: bin_to_nat(Twice(TwicePlusOne Zero)) = 2.
+Proof. reflexivity. Qed.
+Example test_bin_to_nat4:
+  bin_to_nat(Twice(TwicePlusOne(Twice(TwicePlusOne Zero)))) = 10.
+Proof. reflexivity. Qed.
+Example test_bin_to_nat5:
+    bin_to_nat(incr (Twice(TwicePlusOne Zero)))
+  = bin_to_nat(Twice(TwicePlusOne Zero))+1.
+Proof. reflexivity. Qed.
 (** [] *)
 
 (** $Date: 2018-01-10 21:47:50 -0500 (Wed, 10 Jan 2018) $ *)

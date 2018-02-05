@@ -157,44 +157,51 @@ Proof.
 Theorem mult_0_r : forall n:nat,
   n * 0 = 0.
 Proof.
-    intros n. induction n as [| n' IHn'].
-    - simpl. reflexivity.
-    - simpl. rewrite -> IHn'. reflexivity.  
+  induction n as [| n' IHn'].
+  - reflexivity.
+  - simpl. rewrite -> IHn'. reflexivity.
 Qed.
+(* GRADE_THEOREM 0.5: mult_0_r *)
 
 Theorem plus_n_Sm : forall n m : nat,
   S (n + m) = n + (S m).
 Proof.
-    induction n, m.
-    - simpl. reflexivity.
-    - simpl. reflexivity.
-    - simpl. rewrite IHn. reflexivity.
-    - simpl. rewrite -> IHn. reflexivity.  
+  (*induction m.
+  - rewrite <- plus_n_O. induction n.
+    + reflexivity.
+    + simpl. rewrite <- IHn. reflexivity.
+  - simpl.*)
+  induction n, m.
+  - reflexivity.
+  - reflexivity.
+  - simpl. rewrite -> IHn. reflexivity.
+  - simpl. rewrite -> IHn. reflexivity.
 Qed.
+(* GRADE_THEOREM 0.5: plus_n_Sm *)
+
 
 Theorem plus_comm : forall n m : nat,
   n + m = m + n.
 Proof.
-    induction n, m.
-    - reflexivity.
-    - rewrite <- plus_O_n. rewrite <- plus_n_O. reflexivity.
-    - simpl. rewrite IHn. reflexivity.
-    - simpl. rewrite IHn. rewrite plus_n_Sm. simpl. reflexivity. 
+  induction n, m.
+  - reflexivity.
+  - rewrite <- plus_n_O. reflexivity.
+  - rewrite <- plus_n_O. reflexivity.
+  - simpl.  rewrite -> IHn. rewrite -> plus_n_Sm. simpl. reflexivity.
 Qed.
 (* GRADE_THEOREM 0.5: plus_comm *)
 
 Theorem plus_assoc : forall n m p : nat,
   n + (m + p) = (n + m) + p.
-Proof.
-    induction n, m.
-    - reflexivity. 
-    - reflexivity.
-    - simpl. rewrite <- plus_n_O. reflexivity.
-    - induction p. 
-    + simpl. rewrite <- IHn. reflexivity.
-    + simpl. rewrite <- IHn. reflexivity.
- Qed.
-
+Proof. 
+  induction n, m.
+  - reflexivity.
+  - reflexivity.
+  - simpl. rewrite <- plus_n_O. reflexivity.
+  - simpl. induction p.
+    + rewrite <- IHn. reflexivity.
+    + rewrite <- IHn. reflexivity.
+Qed.
 (* GRADE_THEOREM 0.5: plus_assoc *)
 (** [] *)
 
@@ -213,8 +220,7 @@ Lemma double_plus : forall n, double n = n + n .
 Proof.
   induction n.
   - reflexivity.
-  - simpl. rewrite <- plus_n_Sm. rewrite <- IHn.
-   reflexivity.
+  - simpl. rewrite -> IHn. rewrite <- plus_n_Sm. reflexivity.
 Qed.
 (** [] *)
 
@@ -236,9 +242,10 @@ Proof.
 (** Briefly explain the difference between the tactics [destruct]
     and [induction].
 
-(* destruct is basically exactly the same as induction, with the only
-   difference being the lack of an induction hypothesis. *)
+Induction also generates an induction hypothesis.
+
 *)
+
 (** [] *)
 
 (* ################################################################# *)
@@ -436,7 +443,39 @@ Proof.
 
     Theorem: Addition is commutative.
 
-    Proof: (* FILL IN HERE *)
+Theorem plus_comm : forall n m : nat,
+  n + m = m + n.
+Proof.
+  induction n, m.
+  - reflexivity.
+  - rewrite <- plus_n_O. reflexivity.
+  - rewrite <- plus_n_O. reflexivity.
+  - simpl.  rewrite -> IHn. rewrite -> plus_n_Sm. simpl. reflexivity.
+Qed.
+    Proof: 
+    By induction on n and m.
+    
+    First suppose both n = 0 and m = 0.
+    Then 0+0 = 0+0, which follows from the definition of +.
+
+    Next, suppose n = 0. Then 0+m = m+0. 
+    Since n+0 = n, and 0+n = n, both sides are equal.
+    
+    Then suppose m = 0. 
+    By replacing n with m, we get the exact same case as above.
+
+    Finally, suppose n = S n' and m = S m', where 
+      n' + m' = m' + n'
+    We must show that S n' + S m' = S m' + S n'.
+    This simplifies to 
+      S (n' + S m') = S m' + S n'
+    By using the inductive hypothesis this is rewritten to
+      S (S m' + n') = S m' + S n'
+    Since S(n' + m') = n' + (S m'), this is rewritten to
+      S m' + S n' = S m' + S n'
+    which is the same.
+    Qed.
+      
 *)
 (** [] *)
 
@@ -447,23 +486,8 @@ Proof.
 
     Theorem: [true = beq_nat n n] for any [n].
 
-    _Proof_: By induction on [n].
-
-    - First, suppose [n = 0].  We must show
-
-        beq_nat 0 0 = true
-
-      This follows directly from the definition of beq_nat.
-
-    - Next, suppose [n = S n'], where
-
-        beq_nat n' n' = true
-
-      We must show
-
-        beq_nat (S n') (S n') = true
-
-      which is immediate from the induction hypothesis.  _Qed_. *)
+    Proof: (* FILL IN HERE *)
+*)
 (** [] *)
 
 (* ################################################################# *)
@@ -472,40 +496,65 @@ Proof.
 (** **** Exercise: 3 stars, recommended (mult_comm)  *)
 (** Use [assert] to help prove this theorem.  You shouldn't need to
     use induction on [plus_swap]. *)
-
+Check plus_assoc.
+Check plus_comm.
 Theorem plus_swap : forall n m p : nat,
   n + (m + p) = m + (n + p).
 Proof.
   intros n m p.
-  rewrite plus_assoc. rewrite plus_assoc.
-  assert (H: n + m = m + n).
-  { rewrite -> plus_comm. reflexivity. }
-  rewrite -> H. reflexivity. Qed.
+  assert (H: n + m = m + n). { rewrite -> plus_comm. reflexivity. }
+  rewrite -> plus_assoc. rewrite -> plus_assoc.
+  rewrite -> H.
+  reflexivity.
+Qed.
 
 (** Now prove commutativity of multiplication.  (You will probably
     need to define and prove a separate subsidiary theorem to be used
     in the proof of this one.  You may find that [plus_swap] comes in
     handy.) *)
-(** 
-Very close to:
-https://stackoverflow.com/questions/34758527/proving-that-multiplication-is-commutative,
-since I had to look for help online as I was struggling so much with this one.
-*)
+
+Theorem mult_n_O : forall n : nat, n * 0 = 0.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl. rewrite -> IHn. reflexivity.
+Qed.
+
+Theorem plus_n_1 : forall n : nat, n + 1 = S n.
+Proof.
+  intros n.
+  rewrite -> plus_comm.
+  reflexivity.
+Qed.
+
+Theorem mult_n_1: forall n : nat, n*1 = n.
+Proof.
+  induction n as [|n'].
+  - reflexivity.
+  - simpl. rewrite -> IHn'. reflexivity. 
+Qed.
+
+Theorem mult_1_n: forall n : nat, 1*n=n.
+Proof.
+  simpl. intros n. rewrite <- plus_n_O. reflexivity.
+Qed.
+
+Theorem mult_n_sm: forall n m : nat, n*(S m) = n+n*m.
+Proof.
+  induction n.
+  - reflexivity. 
+  - simpl. intros m. rewrite -> IHn. rewrite -> plus_swap. reflexivity. 
+Qed.
+
 Theorem mult_comm : forall m n : nat,
   m * n = n * m.
 Proof.
-  induction m.
-    - induction n.
-      + reflexivity.
-      + simpl. rewrite <- IHn. reflexivity.
-    - induction n.
-        + simpl. rewrite IHm. reflexivity.
-        + simpl. rewrite <- IHn.
-          rewrite -> IHm.
-          simpl. rewrite -> IHm.
-          repeat rewrite plus_assoc.
-          rewrite (plus_comm m n).
-          reflexivity.
+  induction m as [| m'].
+  - intros n. rewrite -> mult_n_O. reflexivity.
+  - simpl. intros n. rewrite -> (IHm').
+    destruct n.
+    + reflexivity.
+    + simpl. rewrite -> mult_n_sm. rewrite -> plus_swap. reflexivity.
 Qed.
 (** [] *)
 
@@ -623,7 +672,35 @@ Proof.
     definitions to make the property easier to prove, feel free to
     do so! *)
 
-(* FILL IN HERE *)
+Inductive bin : Type :=
+  | Zero : bin
+  | Twice : bin -> bin
+  | TwicePlusOne : bin -> bin.
+
+Fixpoint incr (num: bin) :=
+  match num with
+    | Zero => TwicePlusOne(Zero)
+    | Twice p => TwicePlusOne p
+    | TwicePlusOne p => Twice (incr p)
+  end.
+
+Fixpoint bin_to_nat (num: bin) :=
+  match num with
+  | Zero => O
+  | Twice p => mult (bin_to_nat p) 2
+  | TwicePlusOne p => ((bin_to_nat p) * 2) + 1
+  end.
+
+Theorem bin_to_nat_pres_incr : forall n : bin, 
+  bin_to_nat(incr(n)) = S(bin_to_nat(n)).
+Proof.
+  induction n as [|n'|n']. 
+    - simpl. reflexivity.
+    - simpl. assert (H: S(bin_to_nat n'*2) = bin_to_nat n'*2+1).
+      { rewrite <- plus_n_1. reflexivity. }
+      rewrite -> H. reflexivity. 
+    - simpl. rewrite -> IHn'. simpl. rewrite -> plus_n_1. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 5 stars, advanced (binary_inverse)  *)
@@ -652,7 +729,25 @@ Proof.
     Again, feel free to change your earlier definitions if this helps
     here. *)
 
-(* FILL IN HERE *)
+Fixpoint nat_to_bin (num: nat) :=
+  match num with
+  | O => Zero
+  | S n => incr (nat_to_bin n)
+  end.
+
+Theorem nat_to_bin_reversed : forall n : nat, bin_to_nat(nat_to_bin(n)) = n.
+Proof.
+  induction n as [| n'].
+  - reflexivity.
+  - simpl. rewrite -> bin_to_nat_pres_incr. rewrite -> IHn'. reflexivity.
+Qed.
+
+(*
+b)
+0 can be represented in multiple ways in binary format,
+whereas it only has one representation in nat.
+*)
+
 (** [] *)
 
 
