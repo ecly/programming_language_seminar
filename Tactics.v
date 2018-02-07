@@ -105,15 +105,17 @@ Theorem rev_exercise1 : forall (l l' : list nat),
      l = rev l' ->
      l' = rev l.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros l l' H.
+  rewrite H. rewrite rev_involutive. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 1 star, optional (apply_rewrite)  *)
 (** Briefly explain the difference between the tactics [apply] and
     [rewrite].  What are the situations where both can usefully be
     applied?
-
-(* FILL IN HERE *)
+Apply can be used when there are additional conditions that need to be proven,
+which are introduced as subgoals. When there are no conditions, both can be applied.
 *)
 (** [] *)
 
@@ -160,7 +162,7 @@ Proof.
     adding [with (m:=[c,d])] to the invocation of [apply]. *)
 
   apply trans_eq with (m:=[c;d]).
-  apply eq1. apply eq2.   Qed.
+  simpl. apply eq1. apply eq2.   Qed.
 
 (** Actually, we usually don't have to include the name [m] in
     the [with] clause; Coq is often smart enough to figure out which
@@ -250,7 +252,12 @@ Example inversion_ex3 : forall (X : Type) (x y z : X) (l j : list X),
   y :: l = x :: j ->
   x = y.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros X x y z l j ex1 ex2.
+  inversion ex1.
+  inversion ex2.
+  symmetry.
+  apply H0.
+Qed.
 (** [] *)
 
 (** When used on a hypothesis involving an equality between
@@ -314,7 +321,9 @@ Example inversion_ex6 : forall (X : Type)
   y :: l = z :: j ->
   x = z.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros X x y z l j contra ex2.
+  inversion contra.
+Qed.
 (** [] *)
 
 (** To summarize this discussion, suppose [H] is a hypothesis in the
@@ -405,7 +414,16 @@ Theorem plus_n_n_injective : forall n m,
      n = m.
 Proof.
   intros n. induction n as [| n'].
-  (* FILL IN HERE *) Admitted.
+
+  - simpl. intros m H. induction m as [| m']. 
+    + simpl. reflexivity.
+    + simpl. inversion H. 
+  - simpl. intros m H. induction m as [| m'].
+    + simpl. inversion H.
+    + simpl. inversion H. rewrite <- plus_n_Sm in H1. rewrite <- plus_n_Sm in H1.
+      inversion H1. assert (H3: n' = m'). { simpl. rewrite (IHn' m' H2). reflexivity. }
+      simpl. rewrite H3. reflexivity.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -561,14 +579,21 @@ Proof.
 Theorem beq_nat_true : forall n m,
     beq_nat n m = true -> n = m.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction n as [| n'].
+  - simpl. destruct m.
+    + simpl. reflexivity.
+    + simpl. intros contra. inversion contra.
+  - simpl. intros m eq. destruct m as [| m'].
+    + simpl. inversion eq.
+    + simpl. apply f_equal. apply IHn'. inversion eq. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, advanced (beq_nat_true_informal)  *)
 (** Give a careful informal proof of [beq_nat_true], being as explicit
     as possible about quantifiers. *)
 
-(* FILL IN HERE *)
+(* TODO *)
 (** [] *)
 
 (** The strategy of doing fewer [intros] before an [induction] to
@@ -686,7 +711,14 @@ Theorem nth_error_after_last: forall (n : nat) (X : Type) (l : list X),
      length l = n ->
      nth_error l n = None.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros n X l.
+  generalize dependent n.
+  induction l.
+  - simpl. reflexivity.
+  - simpl. destruct n as [| n'].
+    + simpl. intros contra. inversion contra.
+    + simpl. intros H. apply IHl. inversion H. reflexivity.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -940,6 +972,8 @@ Theorem bool_fn_applied_thrice :
   forall (f : bool -> bool) (b : bool),
   f (f (f b)) = f b.
 Proof.
+  intros f b.
+  destruct (f b).
   (* FILL IN HERE *) Admitted.
 (** [] *)
 
