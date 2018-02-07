@@ -973,8 +973,18 @@ Theorem bool_fn_applied_thrice :
   f (f (f b)) = f b.
 Proof.
   intros f b.
-  destruct (f b).
-  (* FILL IN HERE *) Admitted.
+  destruct (f b) eqn:fb.
+  - destruct (f true) eqn:fb2.
+    + apply fb2. 
+    + destruct b.
+      * rewrite fb in fb2. inversion fb2.
+      * apply fb.
+  - destruct (f false) eqn:fb2.
+    + destruct b.
+      * apply fb.
+      * rewrite fb in fb2. inversion fb2.
+    + apply fb2.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -1047,7 +1057,14 @@ Proof.
 Theorem beq_nat_sym : forall (n m : nat),
   beq_nat n m = beq_nat m n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction n as [| n'].
+  - simpl. induction m as [| m']. 
+    + reflexivity.
+    + reflexivity.
+  - simpl. induction m as [| m'].
+    + reflexivity. 
+    + rewrite IHn'. simpl. reflexivity. 
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced, optional (beq_nat_sym_informal)  *)
@@ -1086,10 +1103,20 @@ Proof.
 Definition split_combine_statement : Prop
   (* ("[: Prop]" means that we are giving a name to a
      logical proposition here.) *)
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+  := forall X Y (l: list (X * Y)) (l1 : list X) (l2 : list Y), 
+      length(l1) = length(l2) -> combine l1 l2 = l -> split l = (l1, l2).
 
 Theorem split_combine : split_combine_statement.
 Proof.
+  intros X Y l.
+  induction l.
+  - induction l1, l2. 
+    + simpl. reflexivity.
+    + intros contra. inversion contra. 
+    + intros contra. inversion contra.
+    + intros ex1 ex2. inversion ex2.
+  - simpl. induction x. 
+    
 (* FILL IN HERE *) Admitted.
 
 (** [] *)
