@@ -1136,31 +1136,79 @@ Proof.
 (** **** Exercise: 4 stars, advanced, recommended (forall_exists_challenge)  *) 
 (** Define two recursive [Fixpoints], [forallb] and [existsb].  The
     first checks whether every element in a list satisfies a given
-    predicate:
+    predicate: *)
+Fixpoint forallb {X:Type} (test: X->bool) (l:list X) : bool :=
+  match l with
+  | [] => true
+  | x::xs  => andb (test x) (forallb test xs)
+  end.
 
-      forallb oddb [1;3;5;7;9] = true
 
-      forallb negb [false;false] = true
+Example forall_test1:
+  forallb oddb [1;3;5;7;9] = true.
+Proof. reflexivity. Qed.
 
-      forallb evenb [0;2;4;5] = false
+Example forall_test2:
+  forallb negb [false;false] = true.
+Proof. reflexivity. Qed.
 
-      forallb (beq_nat 5) [] = true
+Example forall_test3:
+  forallb evenb [0;2;4;5] = false.
+Proof. reflexivity. Qed.
 
-    The second checks whether there exists an element in the list that
-    satisfies a given predicate:
+Example forall_test4:
+      forallb (beq_nat 5) [] = true.
+Proof. reflexivity. Qed.
 
-      existsb (beq_nat 5) [0;2;3;6] = false
+(**The second checks whether there exists an element in the list that
+   satisfies a given predicate:*)
 
-      existsb (andb true) [true;true;false] = true
+Fixpoint existsb {X:Type} (test: X->bool) (l:list X) : bool :=
+  match l with
+  | [] => false
+  | x::xs  => if (test x) then true
+              else (existsb test xs)
+  end.
 
-      existsb oddb [1;0;0;0;0;3] = true
+Example existsb_test1:
+  existsb (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
 
-      existsb evenb [] = false
+Example existsb_test2:
+  existsb (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
 
-    Next, define a _nonrecursive_ version of [existsb] -- call it
-    [existsb'] -- using [forallb] and [negb].
+Example existsb_test3:
+  existsb oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
 
-    Finally, prove a theorem [existsb_existsb'] stating that
+Example existsb_test4:
+  existsb evenb [] = false.
+Proof. reflexivity. Qed.
+
+(** Next, define a _nonrecursive_ version of [existsb] -- call it
+    [existsb'] -- using [forallb] and [negb]. **)
+Fixpoint existsb' {X:Type} (test: X->bool) (l:list X) : bool :=
+  negb (forallb (fun x:X => negb (test x)) l)
+.
+
+Example existsb'_test1:
+  existsb' (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
+
+Example existsb'_test2:
+  existsb' (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
+
+Example existsb'_test3:
+  existsb' oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
+
+Example existsb'_test4:
+  existsb' evenb [] = false.
+Proof. reflexivity. Qed.
+
+(** Finally, prove a theorem [existsb_existsb'] stating that
     [existsb'] and [existsb] have the same behavior. *)
 
 (* FILL IN HERE *)
