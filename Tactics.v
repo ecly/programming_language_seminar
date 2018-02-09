@@ -1140,7 +1140,7 @@ Proof.
 Fixpoint forallb {X:Type} (test: X->bool) (l:list X) : bool :=
   match l with
   | [] => true
-  | x::xs  => andb (test x) (forallb test xs)
+  | x::xs  => (test x) && (forallb test xs)
   end.
 
 
@@ -1166,8 +1166,7 @@ Proof. reflexivity. Qed.
 Fixpoint existsb {X:Type} (test: X->bool) (l:list X) : bool :=
   match l with
   | [] => false
-  | x::xs  => if (test x) then true
-              else (existsb test xs)
+  | x::xs  => (test x) || (existsb test xs)
   end.
 
 Example existsb_test1:
@@ -1188,7 +1187,7 @@ Proof. reflexivity. Qed.
 
 (** Next, define a _nonrecursive_ version of [existsb] -- call it
     [existsb'] -- using [forallb] and [negb]. **)
-Fixpoint existsb' {X:Type} (test: X->bool) (l:list X) : bool :=
+Definition existsb' {X:Type} (test: X->bool) (l:list X) : bool :=
   negb (forallb (fun x:X => negb (test x)) l)
 .
 
@@ -1211,9 +1210,15 @@ Proof. reflexivity. Qed.
 (** Finally, prove a theorem [existsb_existsb'] stating that
     [existsb'] and [existsb] have the same behavior. *)
 
-(* FILL IN HERE *)
-(** [] *)
-
+Theorem existsb_existsb' : forall (X : Type) (test : X -> bool) (l : list X),
+  existsb test l = existsb' test l.
+Proof.
+  unfold existsb'.
+  induction l.
+  - reflexivity.
+  - simpl. destruct (test x) eqn: testx.
+    + reflexivity.
+    + simpl. apply IHl.
+Qed.
+    
 (** $Date: 2018-01-13 16:44:48 -0500 (Sat, 13 Jan 2018) $ *)
-
-
