@@ -1103,22 +1103,20 @@ Proof.
 Definition split_combine_statement : Prop
   (* ("[: Prop]" means that we are giving a name to a
      logical proposition here.) *)
-  := forall X Y (l: list (X * Y)) (l1 : list X) (l2 : list Y), 
-      length(l1) = length(l2) -> combine l1 l2 = l -> split l = (l1, l2).
+  := forall X Y (l1 : list X) (l2 : list Y), 
+      length(l1) = length(l2) -> split (combine l1 l2) = (l1, l2).
 
 Theorem split_combine : split_combine_statement.
 Proof.
-  intros X Y l.
-  induction l.
-  - induction l1, l2. 
-    + simpl. reflexivity.
-    + intros contra. inversion contra. 
-    + intros contra. inversion contra.
-    + intros ex1 ex2. inversion ex2.
-  - simpl. induction x. 
-    
-(* FILL IN HERE *) Admitted.
-
+  intros X Y.
+  induction l1, l2.
+  - reflexivity.
+  - intros contra. inversion contra.
+  - intros contra. inversion contra.
+  - simpl. intros H. rewrite IHl1.
+    + reflexivity.
+    + inversion H. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (filter_exercise)  *)
@@ -1130,7 +1128,12 @@ Theorem filter_exercise : forall (X : Type) (test : X -> bool)
      filter test l = x :: lf ->
      test x = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction l.
+  - intros lf contra. inversion contra.
+  - simpl. destruct (test x0) eqn:test_res.
+    + intros lf h. inversion h. rewrite <- H0. apply test_res.
+    + apply IHl. 
+Qed.
 (** [] *)
 
 (** **** Exercise: 4 stars, advanced, recommended (forall_exists_challenge)  *) 
