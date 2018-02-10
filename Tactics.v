@@ -592,8 +592,17 @@ Qed.
 (** **** Exercise: 2 stars, advanced (beq_nat_true_informal)  *)
 (** Give a careful informal proof of [beq_nat_true], being as explicit
     as possible about quantifiers. *)
+(**
+    _Proof_: 
+    From the definition of beq_nat we recursively compare n and m,
+    returning true if they are both 0, false if just one of them is 0
+    and otherwise recursively call [beq_nat] with n and m with one less application
+    of S, meaning the decremented value of n and m.
 
-(* TODO *)
+    By this definition, for n and m to be equal, it must take the exact same
+    number of decrements for n and m to both be 0. Hence if beq_nat returns true,
+    they must by the definition of nat be equal.
+*)
 (** [] *)
 
 (** The strategy of doing fewer [intros] before an [induction] to
@@ -1057,13 +1066,13 @@ Qed.
 Theorem beq_nat_sym : forall (n m : nat),
   beq_nat n m = beq_nat m n.
 Proof.
-  induction n as [| n'].
+  induction n.
   - simpl. induction m as [| m']. 
     + reflexivity.
     + reflexivity.
   - simpl. induction m as [| m'].
     + reflexivity. 
-    + rewrite IHn'. simpl. reflexivity. 
+    + rewrite IHn. simpl. reflexivity. 
 Qed.
 (** [] *)
 
@@ -1074,7 +1083,26 @@ Qed.
    Theorem: For any [nat]s [n] [m], [beq_nat n m = beq_nat m n].
 
    Proof:
-   (* FILL IN HERE *)
+    We prove by induction on first induction on n, then on m that for
+      any [n] [m], that [beq_nat n m = beq_nat m n ]
+
+      - First, by induction on n and then om m, suppose [n = 0] and
+        [m = 0]. We must show that beq_nat 0 0 is true, which it is by
+        definition of beq_nat.
+
+      - We must now show that [beq_nat (S m') 0 = false], which it is by
+        the definition of nat and beq_nat.
+        This gives us the hypothesis, that forall m, 
+        beq_nat n m = beq_nat m n.
+
+      - We now how have to prove that for initial induction on n applies
+        to (S n). We want to show beq_nat (S n) m = beq_nat m (S n), which
+        we do again by induction on m. Similarly to earlier we now initially
+        prove that [beq_nat 0 (S n)] is false, which it is by the definition
+        of nat and beq_nat.
+
+      - Lastly, we need to prove that [beq_nat m' n = beq_nat (S m') (S n)],
+        which we see to be true by the definition of S in nat.
 *)
 (** [] *)
 
@@ -1139,36 +1167,89 @@ Qed.
 (** **** Exercise: 4 stars, advanced, recommended (forall_exists_challenge)  *) 
 (** Define two recursive [Fixpoints], [forallb] and [existsb].  The
     first checks whether every element in a list satisfies a given
-    predicate:
+    predicate: *)
+Fixpoint forallb {X:Type} (test: X->bool) (l:list X) : bool :=
+  match l with
+  | [] => true
+  | x::xs  => (test x) && (forallb test xs)
+  end.
 
-      forallb oddb [1;3;5;7;9] = true
 
-      forallb negb [false;false] = true
+Example forall_test1:
+  forallb oddb [1;3;5;7;9] = true.
+Proof. reflexivity. Qed.
 
-      forallb evenb [0;2;4;5] = false
+Example forall_test2:
+  forallb negb [false;false] = true.
+Proof. reflexivity. Qed.
 
-      forallb (beq_nat 5) [] = true
+Example forall_test3:
+  forallb evenb [0;2;4;5] = false.
+Proof. reflexivity. Qed.
 
-    The second checks whether there exists an element in the list that
-    satisfies a given predicate:
+Example forall_test4:
+      forallb (beq_nat 5) [] = true.
+Proof. reflexivity. Qed.
 
-      existsb (beq_nat 5) [0;2;3;6] = false
+(**The second checks whether there exists an element in the list that
+   satisfies a given predicate:*)
 
-      existsb (andb true) [true;true;false] = true
+Fixpoint existsb {X:Type} (test: X->bool) (l:list X) : bool :=
+  match l with
+  | [] => false
+  | x::xs  => (test x) || (existsb test xs)
+  end.
 
-      existsb oddb [1;0;0;0;0;3] = true
+Example existsb_test1:
+  existsb (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
 
-      existsb evenb [] = false
+Example existsb_test2:
+  existsb (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
 
-    Next, define a _nonrecursive_ version of [existsb] -- call it
-    [existsb'] -- using [forallb] and [negb].
+Example existsb_test3:
+  existsb oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
 
-    Finally, prove a theorem [existsb_existsb'] stating that
+Example existsb_test4:
+  existsb evenb [] = false.
+Proof. reflexivity. Qed.
+
+(** Next, define a _nonrecursive_ version of [existsb] -- call it
+    [existsb'] -- using [forallb] and [negb]. **)
+Definition existsb' {X:Type} (test: X->bool) (l:list X) : bool :=
+  negb (forallb (fun x:X => negb (test x)) l)
+.
+
+Example existsb'_test1:
+  existsb' (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
+
+Example existsb'_test2:
+  existsb' (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
+
+Example existsb'_test3:
+  existsb' oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
+
+Example existsb'_test4:
+  existsb' evenb [] = false.
+Proof. reflexivity. Qed.
+
+(** Finally, prove a theorem [existsb_existsb'] stating that
     [existsb'] and [existsb] have the same behavior. *)
 
-(* FILL IN HERE *)
-(** [] *)
-
+Theorem existsb_existsb' : forall (X : Type) (test : X -> bool) (l : list X),
+  existsb test l = existsb' test l.
+Proof.
+  unfold existsb'.
+  induction l.
+  - reflexivity.
+  - simpl. destruct (test x) eqn: testx.
+    + reflexivity.
+    + simpl. apply IHl.
+Qed.
+    
 (** $Date: 2018-01-13 16:44:48 -0500 (Sat, 13 Jan 2018) $ *)
-
-
