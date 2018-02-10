@@ -592,8 +592,17 @@ Qed.
 (** **** Exercise: 2 stars, advanced (beq_nat_true_informal)  *)
 (** Give a careful informal proof of [beq_nat_true], being as explicit
     as possible about quantifiers. *)
+(**
+    _Proof_: 
+    From the definition of beq_nat we recursively compare n and m,
+    returning true if they are both 0, false if just one of them is 0
+    and otherwise recursively call [beq_nat] with n and m with one less application
+    of S, meaning the decremented value of n and m.
 
-(* TODO *)
+    By this definition, for n and m to be equal, it must take the exact same
+    number of decrements for n and m to both be 0. Hence if beq_nat returns true,
+    they must by the definition of nat be equal.
+*)
 (** [] *)
 
 (** The strategy of doing fewer [intros] before an [induction] to
@@ -1057,13 +1066,13 @@ Qed.
 Theorem beq_nat_sym : forall (n m : nat),
   beq_nat n m = beq_nat m n.
 Proof.
-  induction n as [| n'].
+  induction n.
   - simpl. induction m as [| m']. 
     + reflexivity.
     + reflexivity.
   - simpl. induction m as [| m'].
     + reflexivity. 
-    + rewrite IHn'. simpl. reflexivity. 
+    + rewrite IHn. simpl. reflexivity. 
 Qed.
 (** [] *)
 
@@ -1074,7 +1083,26 @@ Qed.
    Theorem: For any [nat]s [n] [m], [beq_nat n m = beq_nat m n].
 
    Proof:
-   (* FILL IN HERE *)
+    We prove by induction on first induction on n, then on m that for
+      any [n] [m], that [beq_nat n m = beq_nat m n ]
+
+      - First, by induction on n and then om m, suppose [n = 0] and
+        [m = 0]. We must show that beq_nat 0 0 is true, which it is by
+        definition of beq_nat.
+
+      - We must now show that [beq_nat (S m') 0 = false], which it is by
+        the definition of nat and beq_nat.
+        This gives us the hypothesis, that forall m, 
+        beq_nat n m = beq_nat m n.
+
+      - We now how have to prove that for initial induction on n applies
+        to (S n). We want to show beq_nat (S n) m = beq_nat m (S n), which
+        we do again by induction on m. Similarly to earlier we now initially
+        prove that [beq_nat 0 (S n)] is false, which it is by the definition
+        of nat and beq_nat.
+
+      - Lastly, we need to prove that [beq_nat m' n = beq_nat (S m') (S n)],
+        which we see to be true by the definition of S in nat.
 *)
 (** [] *)
 
