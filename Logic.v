@@ -1315,12 +1315,32 @@ Proof. apply even_bool_prop. reflexivity. Qed.
 Lemma andb_true_iff : forall b1 b2:bool,
   b1 && b2 = true <-> b1 = true /\ b2 = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. split.
+  - intros. destruct b1.
+    + destruct b2.
+      * split. reflexivity. reflexivity.
+      * inversion H.
+    + inversion H.
+  - intros [HB1 HB2].
+    rewrite HB1. rewrite HB2. simpl. reflexivity.
+Qed.
 
 Lemma orb_true_iff : forall b1 b2,
   b1 || b2 = true <-> b1 = true \/ b2 = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. split.
+  - intros. destruct b1.
+    + left. reflexivity.
+    + right. apply H.
+  - intros. inversion H. 
+    + destruct b1.
+      * reflexivity.
+      * inversion H0.
+    + destruct b1.
+      * rewrite H0. reflexivity.
+      * rewrite H0. reflexivity.
+Qed.
+
 (** [] *)
 
 (** **** Exercise: 1 star (beq_nat_false_iff)  *)
@@ -1328,11 +1348,26 @@ Proof.
     [beq_nat_true_iff] that is more convenient in certain
     situations (we'll see examples in later chapters). *)
 
+Lemma beq_nat_eq : forall x : nat,
+  beq_nat x x = true.
+Proof.
+  intros.
+  induction x.
+  - reflexivity.
+  - apply IHx.
+Qed.
+
 Theorem beq_nat_false_iff : forall x y : nat,
   beq_nat x y = false <-> x <> y.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros. split.
+  - intros H F.
+    rewrite F in H. rewrite beq_nat_eq in H.
+    inversion H.
+  - intros H. destruct (beq_nat x y) eqn: beq.
+    + apply beq_nat_true in beq. apply H in beq. inversion beq.
+    + reflexivity.
+Qed.
 
 (** **** Exercise: 3 stars (beq_list)  *)
 (** Given a boolean operator [beq] for testing equality of elements of
@@ -1342,16 +1377,43 @@ Proof.
     definition is correct, prove the lemma [beq_list_true_iff]. *)
 
 Fixpoint beq_list {A : Type} (beq : A -> A -> bool)
-                  (l1 l2 : list A) : bool
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+                  (l1 l2 : list A) : bool :=
+  match l1, l2 with
+  | [], [] => true
+  | x::xss, y::yss => (beq x y) && (beq_list beq xss yss)
+  | _, _ => false
+  end.
 
 Lemma beq_list_true_iff :
   forall A (beq : A -> A -> bool),
     (forall a1 a2, beq a1 a2 = true <-> a1 = a2) ->
     forall l1 l2, beq_list beq l1 l2 = true <-> l1 = l2.
 Proof.
-(* FILL IN HERE *) Admitted.
-(** [] *)
+  intros A beq H.
+  induction l1.
+  - split.
+    + intros. destruct l2.
+      * reflexivity.
+      * inversion H0.
+    + intros. destruct l2.
+      * reflexivity.
+      * inversion H0.
+  - induction l2.
+    + split.
+      * intros. inversion H0.
+      * intros. inversion H0.
+    + simpl. split.
+      * intros. apply andb_true_iff in H0.
+        destruct H0.
+        apply H in H0.
+        apply IHl1 in H1.
+        rewrite H0. rewrite H1. reflexivity.
+      * intros. inversion H0.
+        apply andb_true_iff. 
+        split.
+        { apply H. reflexivity. }
+        { rewrite <- H3. apply IHl1. reflexivity. }
+Qed.
 
 (** **** Exercise: 2 stars, recommended (All_forallb)  *)
 (** Recall the function [forallb], from the exercise
