@@ -400,20 +400,36 @@ Definition list123''' := [1; 2; 3].
 (** Here are a few simple exercises, just like ones in the [Lists]
     chapter, for practice with polymorphism.  Complete the proofs below. *)
 
+Check f_equal.
+
 Theorem app_nil_r : forall (X:Type), forall l:list X,
   l ++ [] = l.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction l.
+  - reflexivity.
+  - apply (f_equal (cons x)).
+    apply IHl.
+Qed.
 
 Theorem app_assoc : forall A (l m n:list A),
   l ++ m ++ n = (l ++ m) ++ n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction l.
+  - intros. simpl. reflexivity.
+  - intros. simpl. 
+    apply (f_equal (cons x)).
+    apply IHl.
+Qed.
 
 Lemma app_length : forall (X:Type) (l1 l2 : list X),
   length (l1 ++ l2) = length l1 + length l2.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction l1.
+  - intros. simpl. reflexivity.
+  - intros. simpl. 
+    apply (f_equal (S)).
+    apply IHl1.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (more_poly_exercises)  *)
