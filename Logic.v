@@ -807,7 +807,7 @@ Proof.
     simpl. intros [].
   - (* l = x' :: l' *)
     simpl. intros [H | H]
-    + rewrite H. left. reflexivity.
+    + rewrite H. left. rewrite <- H. reflexivity.
     + right. apply IHl'. apply H.
 Qed.
 
