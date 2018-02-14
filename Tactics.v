@@ -73,7 +73,8 @@ Theorem silly_ex :
      evenb 3 = true ->
      oddb 4 = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. apply H in H0. apply H0.
+Qed.
 (** [] *)
 
 (** To use the [apply] tactic, the (conclusion of the) fact
@@ -175,7 +176,13 @@ Example trans_eq_exercise : forall (n m o p : nat),
      (n + p) = m ->
      (n + p) = (minustwo o).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. 
+  apply trans_eq with (m:=m).
+  - apply H0.
+  - apply H.
+  (* Alternate simpler proof without apply with*)
+  (* intros. rewrite <- H0 in H. apply H. *)
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -1106,13 +1113,25 @@ Qed.
 *)
 (** [] *)
 
+Lemma beq_nat_aux : forall n m, 
+    beq_nat (S n) m = true -> 
+    beq_nat n m = false.
+Proof.
+Admitted.
+
 (** **** Exercise: 3 stars, optional (beq_nat_trans)  *)
 Theorem beq_nat_trans : forall n m p,
   beq_nat n m = true ->
   beq_nat m p = true ->
   beq_nat n p = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction n.
+  - intros. apply beq_nat_true in H.
+    rewrite <- H in H0. apply H0.
+  - intros. apply beq_nat_true in H.
+    rewrite <- H in H0.
+    apply H0.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (split_combine)  *)
