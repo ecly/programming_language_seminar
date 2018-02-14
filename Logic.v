@@ -806,7 +806,7 @@ Proof.
   - (* l = nil, contradiction *)
     simpl. intros [].
   - (* l = x' :: l' *)
-    simpl. intros [H | H].
+    simpl. intros [H | H]
     + rewrite H. left. reflexivity.
     + right. apply IHl'. apply H.
 Qed.
@@ -871,7 +871,7 @@ Qed.
 Fixpoint All {T : Type} (P : T -> Prop) (l : list T) : Prop :=
   match l with
   | [] => True
-  | x' :: l' => P x' \/ All P l'
+  | x' :: l' => P x' /\ All P l'
   end.
 
 Lemma All_In :
@@ -884,8 +884,13 @@ Proof.
     + reflexivity.
     + intros. destruct H0.
   - simpl. split.
-    + intros. rewrite <- IHl.
-  (* FILL IN HERE *) Admitted.
+    + intros. split. 
+      * apply H. left. reflexivity.
+      * apply IHl. intros. apply H. right. apply H0. 
+    + intros. destruct H0. 
+      * rewrite <- H0. inversion H. apply H1.
+      * destruct H. rewrite <- IHl in H1. apply H1. apply H0.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars (combine_odd_even)  *)
@@ -895,8 +900,8 @@ Proof.
     equivalent to [Podd n] when [n] is odd and equivalent to [Peven n]
     otherwise. *)
 
-Definition combine_odd_even (Podd Peven : nat -> Prop) : nat -> Prop
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Definition combine_odd_even (Podd Peven : nat -> Prop) : nat -> Prop :=
+  fun n => if evenb n then Peven n else Podd n.
 
 (** To test your definition, prove the following facts: *)
 
@@ -906,7 +911,13 @@ Theorem combine_odd_even_intro :
     (oddb n = false -> Peven n) ->
     combine_odd_even Podd Peven n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. unfold combine_odd_even. unfold oddb in *. 
+  induction n.
+  - simpl in *. apply H0. reflexivity.
+  - destruct (evenb (S n)). 
+    + apply H0. reflexivity. 
+    + apply H. reflexivity. 
+Qed.
 
 Theorem combine_odd_even_elim_odd :
   forall (Podd Peven : nat -> Prop) (n : nat),
@@ -914,7 +925,11 @@ Theorem combine_odd_even_elim_odd :
     oddb n = true ->
     Podd n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. unfold combine_odd_even in H. unfold oddb in H0.
+  destruct (evenb n).
+  - inversion H0.
+  - apply H.
+Qed.
 
 Theorem combine_odd_even_elim_even :
   forall (Podd Peven : nat -> Prop) (n : nat),
@@ -922,7 +937,11 @@ Theorem combine_odd_even_elim_even :
     oddb n = false ->
     Peven n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. unfold combine_odd_even in H. unfold oddb in H0.
+  destruct (evenb n).
+  - apply H.
+  - inversion H0.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -1151,18 +1170,18 @@ Fixpoint rev_append {X} (l1 l2 : list X) : list X :=
 Definition tr_rev {X} (l : list X) : list X :=
   rev_append l [].
 
-(** This version is said to be _tail-recursive_, because the recursive
-    call to the function is the last operation that needs to be
-    performed (i.e., we don't have to execute [++] after the recursive
-    call); a decent compiler will generate very efficient code in this
-    case.  Prove that the two definitions are indeed equivalent. *)
-
-(* How to do this from the proper syntax? *)
-Lemma tr_rev_correct : forall X (l:list X), tr_rev l = rev l.
+Lemma tr_rev_general : forall X (xs: list X) ys, rev_append xs ys = rev xs ++ ys.
 Proof.
-  intros. 
-  induction l.
-(* FILL IN HERE *) Admitted.
+ induction xs.
+ - intros. simpl. reflexivity.
+ - simpl. intros. rewrite <- app_assoc. simpl. rewrite IHxs. reflexivity.
+Qed.
+
+Lemma tr_rev_correct : forall X, @tr_rev X = @rev X.
+Proof.
+  intros X. apply functional_extensionality. intros l.
+  unfold tr_rev. rewrite tr_rev_general. rewrite app_nil_r. reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -1190,14 +1209,19 @@ Proof.
   - reflexivity.
   - simpl. apply IHk'.
 Qed.
-
+  
 (** **** Exercise: 3 stars (evenb_double_conv)  *)
 Theorem evenb_double_conv : forall n,
   exists k, n = if evenb n then double k
                 else S (double k).
 Proof.
-  (* Hint: Use the [evenb_S] lemma from [Induction.v]. *)
-  (* FILL IN HERE *) Admitted.
+  intros. 
+  induction n.
+  - exists 0. reflexivity.
+  - rewrite evenb_S. destruct (evenb n).
+    + simpl. destruct IHn. exists x. rewrite H. reflexivity. 
+    + simpl. destruct IHn. exists (S x). rewrite H. simpl. reflexivity.
+Qed.
 (** [] *)
 
 Theorem even_bool_prop : forall n,
