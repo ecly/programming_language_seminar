@@ -553,7 +553,8 @@ End MyEquality.
 Lemma equality__leibniz_equality : forall (X : Type) (x y: X),
   x = y -> forall P:X->Prop, P x -> P y.
 Proof.
-(* FILL IN HERE *) Admitted.
+    intros. rewrite H in H0. apply H0.
+Qed.
 (** [] *)
 
 (** **** Exercise: 5 stars, optional (leibniz_equality__equality)  *)
@@ -563,7 +564,8 @@ Proof.
 Lemma leibniz_equality__equality : forall (X : Type) (x y: X),
   (forall P:X->Prop, P x -> P y) -> x = y.
 Proof.
-(* FILL IN HERE *) Admitted.
+    intros. apply H. reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
