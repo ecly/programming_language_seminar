@@ -130,7 +130,10 @@ Qed.
 Theorem ev_double : forall n,
   ev (double n).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  induction n.
+  - apply ev_0.
+  - simpl. apply ev_SS. apply IHn.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -274,7 +277,11 @@ Proof.
 Theorem SSSSev__even : forall n,
   ev (S (S (S (S n)))) -> ev n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  inversion H.
+  inversion H1. 
+  apply H3.
+Qed.
 (** [] *)
 
 (** **** Exercise: 1 star (even5_nonsense)  *)
@@ -283,7 +290,11 @@ Proof.
 Theorem even5_nonsense :
   ev 5 -> 2 + 2 = 9.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  inversion H.
+  inversion H1.
+  inversion H3.
+Qed.
 (** [] *)
 
 (** The way we've used [inversion] here may seem a bit
@@ -409,7 +420,11 @@ Qed.
 (** **** Exercise: 2 stars (ev_sum)  *)
 Theorem ev_sum : forall n m, ev n -> ev m -> ev (n + m).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  induction H.
+  - simpl. apply H0.
+  - simpl. apply ev_SS. apply IHev.
+Qed.
 (** [] *)
 
 (** **** Exercise: 4 stars, advanced, optional (ev'_ev)  *)
@@ -435,10 +450,15 @@ Proof.
 (** Finding the appropriate thing to do induction on is a
     bit tricky here: *)
 
+Check evSS_ev.
 Theorem ev_ev__ev : forall n m,
   ev (n+m) -> ev n -> ev m.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  induction H0. 
+  - simpl in H. apply H.
+  - apply IHev. apply evSS_ev. simpl in H. apply H.
+Qed. 
 (** [] *)
 
 (** **** Exercise: 3 stars, optional (ev_plus_plus)  *)
@@ -632,18 +652,18 @@ Inductive R : nat -> nat -> nat -> Prop :=
    | c5 : forall m n o, R m n o -> R n m o.
 
 (** - Which of the following propositions are provable?
-      - [R 1 1 2]
+      - [R 1 1 2] (This one is)
       - [R 2 2 6]
 
     - If we dropped constructor [c5] from the definition of [R],
       would the set of provable propositions change?  Briefly (1
       sentence) explain your answer.
+    - No, since it is just the identity function.
 
     - If we dropped constructor [c4] from the definition of [R],
       would the set of provable propositions change?  Briefly (1
       sentence) explain your answer.
-
-(* FILL IN HERE *)
+    - No, since c2 and c3 combined have the same effect as c4.
 *)
 (** [] *)
 
@@ -697,8 +717,26 @@ End R.
       transitive -- that is, if [l1] is a subsequence of [l2] and [l2]
       is a subsequence of [l3], then [l1] is a subsequence of [l3].
       Hint: choose your induction carefully! *)
+Inductive subseq : list nat -> list nat -> Prop :=
+| sub_l0 : forall l, subseq [] l
+| sub_head : forall x l l', subseq l l' -> subseq (x::l) (x::l')
+| sub_tail : forall x y l l', subseq (x::l) l' -> subseq (x::l) (y::l').
 
-(* FILL IN HERE *)
+Theorem subseq_refl : forall l, subseq l l.
+Proof.
+  induction l.
+  - apply sub_l0.
+  - apply sub_head. apply IHl.
+Qed.
+
+Theorem subseq_app : forall l1 l2 l3, subseq l1 l2 -> subseq l1 (l2++l3).
+Proof. 
+  intros.
+  induction H.
+  - apply sub_l0.
+  - simpl. apply sub_head. apply IHsubseq.
+  - simpl. apply sub_tail. apply IHsubseq.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (R_provability2)  *)
@@ -926,13 +964,17 @@ Qed.
 Lemma empty_is_empty : forall T (s : list T),
   ~ (s =~ EmptySet).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. unfold not. intros. inversion H.
+Qed.
 
 Lemma MUnion' : forall T (s : list T) (re1 re2 : @reg_exp T),
   s =~ re1 \/ s =~ re2 ->
   s =~ Union re1 re2.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. destruct H.
+  - apply MUnionL. apply H. 
+  - apply MUnionR. apply H.
+Qed.
 
 (** The next lemma is stated in terms of the [fold] function from the
     [Poly] chapter: If [ss : list (list T)] represents a sequence of
@@ -943,7 +985,12 @@ Lemma MStar' : forall T (ss : list (list T)) (re : reg_exp),
   (forall s, In s ss -> s =~ re) ->
   fold app ss [] =~ Star re.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. induction ss.
+  - simpl. apply MStar0.
+  - simpl. apply MStarApp.
+    + apply H. simpl. left. reflexivity.
+    + apply IHss. intros. apply H. simpl. right. apply H0.
+Qed.
 (** [] *)
 
 (** **** Exercise: 4 stars, optional (reg_exp_of_list_spec)  *)
@@ -1036,13 +1083,85 @@ Qed.
     regular expression matches some string. Prove that your function
     is correct. *)
 
-Fixpoint re_not_empty {T : Type} (re : @reg_exp T) : bool
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Fixpoint re_not_empty {T : Type} (re : @reg_exp T) : bool :=
+  match re with
+  | EmptySet => false
+  | App r1 r2 => re_not_empty r1 && re_not_empty r2
+  | Union r1 r2 => re_not_empty r1 || re_not_empty r2
+  | _ => true
+  end.
 
+Lemma orb_true_r : forall x, x || true = true.
+Proof.
+  intros. destruct x. 
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
+
+Lemma orb_true_l : forall x, true || x = true.
+Proof.
+  intros. destruct x. 
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
+
+Lemma andb_elim_r : forall x y, x && y = true -> x = true.
+Proof.
+  intros.
+  destruct x, y.
+  + reflexivity.
+  + inversion H.
+  + inversion H.
+  + inversion H.
+Qed.
+
+Lemma orb_to_or : forall x y, x || y = true -> x = true \/ y = true.
+Proof.
+  intros. destruct x, y.
+  - left. reflexivity.
+  - left. reflexivity.
+  - right. reflexivity.
+  - inversion H.
+Qed.
+  
+(* It would be nice to see a proper solution for this *)
 Lemma re_not_empty_correct : forall T (re : @reg_exp T),
   (exists s, s =~ re) <-> re_not_empty re = true.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. split.
+  - intros. destruct H. induction H.
+    + simpl. reflexivity.
+    + reflexivity.
+    + simpl. rewrite IHexp_match1. rewrite IHexp_match2. reflexivity.
+    + simpl. rewrite IHexp_match. reflexivity.
+    + simpl. rewrite IHexp_match. simpl. rewrite orb_true_r. reflexivity.
+    + simpl. reflexivity.
+    + simpl. reflexivity.
+  - intros. induction re.
+    + inversion H.
+    + exists []. apply MEmpty.
+    + exists [t]. apply MChar.
+    + simpl. inversion H. destruct IHre1, IHre2.
+      * apply andb_true_elim2 in H1. apply H1.
+      * apply andb_elim_r in H1. apply H1. 
+      * apply andb_true_elim2 in H1. apply H1.
+      * exists (x++x0). apply (MApp). { apply H0. } { apply H2. }
+    + inversion H. 
+      (* For some reason orb_to_or above doesn't work *)
+      assert (Q : re_not_empty re1 || re_not_empty re2 = true 
+                    -> re_not_empty re1 = true \/ re_not_empty re2 = true).
+        {
+        intros. destruct (re_not_empty re1), (re_not_empty re2).
+        - left. reflexivity.
+        - left. reflexivity.
+        - right. reflexivity.
+        - inversion H0. 
+        } 
+      apply Q in H1. clear Q. destruct H1.
+      * destruct IHre1. { apply H0. } { exists x. apply MUnionL. apply H1. }
+      * destruct IHre2. { apply H0. } { exists x. apply MUnionR. apply H1. }
+    + exists []. apply MStar0. 
+Qed.
 (** [] *)
 
 (* ================================================================= *)
