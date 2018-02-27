@@ -441,13 +441,24 @@ Qed.
     it is sound.  Use the tacticals we've just seen to make the proof
     as elegant as possible. *)
 
-Fixpoint optimize_0plus_b (b : bexp) : bexp
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Fixpoint optimize_0plus_b (b : bexp) : bexp :=
+  match b with
+  | BTrue => BTrue
+  | BFalse => BFalse
+  | BEq a b => BEq (optimize_0plus a) (optimize_0plus b)
+  | BLe a b => BLe (optimize_0plus a) (optimize_0plus b)
+  | BNot a => BNot (optimize_0plus_b a)
+  | BAnd a b => BAnd (optimize_0plus_b a) (optimize_0plus_b b)
+  end.
 
 Theorem optimize_0plus_b_sound : forall b,
   beval (optimize_0plus_b b) = beval b.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. induction b;
+  simpl; subst; repeat rewrite optimize_0plus_sound; try reflexivity.
+  - rewrite IHb. reflexivity.
+  - rewrite IHb1. rewrite IHb2. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 4 stars, optional (optimizer)  *)
@@ -750,16 +761,46 @@ Qed.
 (** Write a relation [bevalR] in the same style as
     [aevalR], and prove that it is equivalent to [beval].*)
 
+Reserved Notation "e '\?' n" (at level 50, left associativity).
 Inductive bevalR: bexp -> bool -> Prop :=
-(* FILL IN HERE *)
-.
+  | E_BTrue : BTrue \? true
+  | E_BFalse : BFalse \? false
+  | E_BEq : forall (e1 e2 : aexp) (n1 n2 : nat),
+    (e1 \\ n1)
+    -> (e2 \\ n2)
+    -> (BEq e1 e2) \? (beq_nat n1 n2)
+  | E_BLe : forall (e1 e2 : aexp) (n1 n2 : nat),
+    (e1 \\ n1)
+    -> (e2 \\ n2)
+    -> (BLe e1 e2) \? (leb n1 n2)
+  | E_BNot : forall (e : bexp) (b : bool),
+    (e \? b)
+    -> (BNot e) \? (negb b)
+  | E_BAnd : forall (e1 e2 : bexp) (b1 b2 : bool),
+    (e1 \? b1)
+    -> (e2 \? b2)
+    -> (BAnd e1 e2) \? (andb b1 b2)
+where "e '\?' n" := (bevalR e n) : type_scope.
 
 Lemma beval_iff_bevalR : forall b bv,
   bevalR b bv <-> beval b = bv.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
+  split.
+  - intros H. 
+    induction H; simpl; 
+    repeat rewrite aeval_iff_aevalR in *; try rewrite H, H0;
+    try reflexivity.
+    + rewrite IHbevalR. reflexivity.
+    + rewrite IHbevalR1. rewrite IHbevalR2. reflexivity.
+  - generalize dependent bv.
+    induction b; intros; subst.
+    + apply E_BTrue.
+    + apply E_BFalse.
+    + apply E_BEq; rewrite aeval_iff_aevalR; reflexivity.
+    + apply E_BLe; rewrite aeval_iff_aevalR; reflexivity.
+    + apply E_BNot. apply IHb. reflexivity.
+    + apply E_BAnd. apply IHb1. reflexivity. apply IHb2. reflexivity.
+Qed.
 End AExp.
 
 (* ================================================================= *)
