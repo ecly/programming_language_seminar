@@ -266,6 +266,7 @@ Proof.
 
 Lemma beq_stringP : forall x y, reflect (x = y) (beq_string x y).
 Proof.
+  intros.
   (* FILL IN HERE *) Admitted.
 (** [] *)
 
@@ -280,10 +281,15 @@ Proof.
     update a map to assign key [x] the same value as it already has in
     [m], then the result is equal to [m]: *)
 
+Check beq_string_true_iff.
 Theorem t_update_same : forall X x (m : total_map X),
     m & { x --> m x } = m.
-  Proof.
-  (* FILL IN HERE *) Admitted.
+Proof.
+  unfold t_update. intros. apply functional_extensionality. intros.
+  destruct (beq_string x x0) eqn:res.
+  - rewrite beq_string_true_iff in res. rewrite res. reflexivity.
+  - reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, recommended (t_update_permute)  *)
@@ -297,7 +303,13 @@ Theorem t_update_permute : forall (X:Type) v1 v2 x1 x2
   m & { x2 --> v2 ; x1 --> v1 }
   =  m & { x1 --> v1 ; x2 --> v2 }.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. unfold t_update. apply functional_extensionality. intros.
+  destruct (beq_string x1 x) eqn:res1.
+  - destruct (beq_string x2 x) eqn:res2.
+    + rewrite beq_string_true_iff in *. rewrite res1 in H. rewrite res2 in H. congruence.
+    + reflexivity.
+  - reflexivity.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
