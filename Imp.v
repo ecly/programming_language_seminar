@@ -1477,9 +1477,17 @@ Proof.
 
 (** **** Exercise: 3 stars, recommended (XtimesYinZ_spec)  *)
 (** State and prove a specification of [XtimesYinZ]. *)
+Theorem  XtimesYinZ_spec: forall st n m st',
+  st X = n ->
+  st Y = m ->
+  XtimesYinZ / st \\ st' ->
+  st' Z = (n * m).
+Proof.
+  intros st n m st' HX HY Heval.
 
-(* FILL IN HERE *)
-(** [] *)
+  inversion Heval. subst. clear Heval. simpl.
+  apply t_update_eq.  
+Qed.
 
 (** **** Exercise: 3 stars, recommended (loop_never_stops)  *)
 Theorem loop_never_stops : forall st st',
@@ -1488,14 +1496,15 @@ Proof.
   intros st st' contra. unfold loop in contra.
   remember (WHILE true DO SKIP END) as loopdef
            eqn:Heqloopdef.
-
   (** Proceed by induction on the assumed derivation showing that
       [loopdef] terminates.  Most of the cases are immediately
       contradictory (and so can be solved in one step with
       [inversion]). *)
 
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  induction contra; try congruence.
+  - inversion Heqloopdef.
+    + rewrite H1 in *. rewrite H2 in *. inversion H.
+Qed.
 
 (** **** Exercise: 3 stars (no_whiles_eqv)  *)
 (** Consider the following function: *)
