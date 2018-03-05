@@ -1367,6 +1367,7 @@ Proof.
   apply E_Seq with { X --> 0 }.
   - apply E_Ass. reflexivity.
   - apply E_Seq with { X --> 0; Y --> 1 }. apply E_Ass; reflexivity.
+  + constructor. reflexivity.
 Qed.
 
 (** **** Exercise: 3 stars, optional (pup_to_n)  *)
