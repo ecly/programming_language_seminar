@@ -1195,7 +1195,8 @@ Inductive ceval : com -> state -> state -> Prop :=
                   c1 / st \\ st' ->
                   (WHILE b1 DO c1 END) / st' \\ st'' ->
                   (WHILE b1 DO c1 END) / st \\ st''
-(* FILL IN HERE *)
+  | E_If1True : forall st st' b c, beval st b = true -> c / st \\ st' -> (IF1 b THEN c FI) / st \\ st'
+  | E_If1False : forall st b c, beval st b = false -> (IF1 b THEN c FI) / st \\ st
 
   where "c1 '/' st '\\' st'" := (ceval c1 st st').
 
@@ -1216,7 +1217,16 @@ Notation "{{ P }}  c  {{ Q }}" := (hoare_triple P c Q)
     for one-sided conditionals. Try to come up with a rule that is
     both sound and as precise as possible. *)
 
-(* FILL IN HERE *)
+Theorem hoare_if1 : forall P Q b c,
+  {{fun st => P st /\ bassn b st}} c {{Q}} ->
+  {{fun st => P st /\ ~(bassn b st)}} SKIP {{Q}} ->
+  {{P}} (IF1 b THEN c FI) {{Q}}.
+Proof.
+  intros P Q b c HTrue HFalse st st' C H. inversion C; subst. 
+  - apply (HTrue st st'). { assumption. } split. { assumption. } apply bexp_eval_true. assumption.
+  - apply (HFalse st' st'). { apply E_Skip. } split. { assumption. } unfold bassn, not.
+  rewrite H4. intros contra. inversion contra.
+Qed.
 
 (** For full credit, prove formally [hoare_if1_good] that your rule is
     precise enough to show the following valid Hoare triple:
@@ -1238,7 +1248,13 @@ Lemma hoare_if1_good :
     X ::= X + Y
   FI
   {{ fun st => st X = st Z }}.
-Proof. (* FILL IN HERE *) Admitted.
+Proof.
+  apply hoare_if1; intros st st' c P; inversion P; inversion c; subst.
+  - apply H.
+  - unfold bassn in H0. simpl in H0. destruct (st' Y).
+    + rewrite <- plus_n_O in H. apply H.
+    + contradiction.
+Qed.
 
 End If1.
 (** [] *)
