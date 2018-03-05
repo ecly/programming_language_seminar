@@ -370,6 +370,7 @@ Proof.
 Definition assn_sub X a P : Assertion :=
   fun (st : state) =>
     P (st & { X  --> aeval st a }).
+Check assn_sub.
 
 Notation "P [ X |-> a ]" := (assn_sub X a P) (at level 10).
 
@@ -472,8 +473,19 @@ Proof.
 
    ...into formal statements (use the names [assn_sub_ex1] 
    and [assn_sub_ex2]) and use [hoare_asgn] to prove them. *)
+Example assn_sub_ex1 : {{ (fun st => st X <= 10) [X |-> 2*X] }}
+  (X ::= 2*X)
+  {{ fun st => st X <= 10 }}.
+Proof.
+  apply hoare_asgn.
+Qed.
 
-(* FILL IN HERE *)
+Example assn_sub_ex2 : {{ (fun st => 0 <= st X /\ st X <= 5) [ X |-> 3] }}
+  (X ::= 3)
+  {{ fun st => 0 <= st X /\ st X <= 5 }}.
+Proof.
+  apply hoare_asgn.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, recommended (hoare_asgn_wrong)  *)
@@ -491,7 +503,7 @@ Proof.
     [a], and your counterexample needs to exhibit an [a] for which 
     the rule doesn't work.) *)
 
-(* FILL IN HERE *)
+(* If a = X+1, then the post condition would say that X=X+1, which is a contradiction. *)
 (** [] *)
 
 Local Close Scope aexp_scope.
@@ -520,7 +532,11 @@ Theorem hoare_asgn_fwd :
   {{fun st => P (st & { X --> m })
             /\ st X = aeval  (st & { X --> m }) a }}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  unfold hoare_triple. intros. inversion H0. inversion H. subst.
+   split; rewrite t_update_shadow; rewrite t_update_same.
+  - apply H1.
+  - rewrite t_update_eq. reflexivity.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, advanced, optional (hoare_asgn_fwd_exists)  *)
@@ -707,7 +723,7 @@ Example hoare_asgn_example1' :
 Proof.
   eapply hoare_consequence_pre.
   apply hoare_asgn.
-  intros st H.  reflexivity.  Qed.
+  intros st H. reflexivity.  Qed.
 
 (** In general, [eapply H] tactic works just like [apply H] except
     that, instead of failing if unifying the goal with the conclusion
@@ -797,7 +813,21 @@ Qed.
    [assn_sub_ex2']) and use [hoare_asgn] and [hoare_consequence_pre] 
    to prove them. *)
 
-(* FILL IN HERE *)
+Example assn_sub_ex1' :
+  {{ fun st => st X+1 <= 5 }} (X ::= X+1) {{ fun st => st X <= 5 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  - apply hoare_asgn.
+  - intros s H. assumption.
+Qed.
+
+Example assn_sub_ex2' :
+  {{ fun st => 0 <= 3 /\ 3 <= 5 }} (X ::= 3) {{ fun st => 0 <= st X /\ st X <= 5 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  - apply hoare_asgn.
+  - intros s H. apply H.
+Qed.
 (** [] *)
 
 
@@ -900,7 +930,14 @@ Example hoare_asgn_example4 :
   {{fun st => True}} (X ::= 1;; Y ::= 2)
   {{fun st => st X = 1 /\ st Y = 2}}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  eapply hoare_seq.
+  - eapply hoare_consequence_pre. 
+    + apply hoare_asgn.
+    + intros st H. apply H.
+  - eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + intros st H. split; simpl; reflexivity. 
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars (swap_exercise)  *)
@@ -911,15 +948,23 @@ Proof.
 
     Your proof should not need to use [unfold hoare_triple]. *)
 
-Definition swap_program : com 
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Definition swap_program : com :=
+  Z ::= X;;
+  X ::= Y;;
+  Y ::= Z.
 
 Theorem swap_exercise :
   {{fun st => st X <= st Y}}
   swap_program
   {{fun st => st Y <= st X}}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  unfold swap_program.
+  eapply hoare_seq.
+  - eapply hoare_seq; apply hoare_asgn.
+  - eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + intros st H. apply H.
+  Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars (hoarestate1)  *)
@@ -930,8 +975,7 @@ Proof.
            (X ::= 3;; Y ::= a)
          {{fun st => st Y = n}}.
 *)
-
-(* FILL IN HERE *)
+(* X ::= 3 changes the state, which means that a might no longer evaluate to n in the new state. *)
 (** [] *)
 
 (* ================================================================= *)
@@ -1057,15 +1101,32 @@ Qed.
 (** Prove the following hoare triple using [hoare_if].  Do not
     use [unfold hoare_triple].  *)
 
+Theorem nat_sub_equal : forall x y, x <=? y = true -> y = x + (y-x).
+Proof.
+  induction x, y.
+  - reflexivity.
+  - reflexivity.
+  - intros. inversion H.
+  - intros. simpl. f_equal. apply IHx. apply H.
+Qed.
+
 Theorem if_minus_plus :
   {{fun st => True}}
   IFB X <= Y
     THEN Z ::= Y - X
     ELSE Y ::= X + Z
-  FI
+  FI 
   {{fun st => st Y = st X + st Z}}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply hoare_if.
+  - eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + intros st H. inversion H. inversion H1. unfold bassn, assn_sub, t_update, assert_implies. simpl. 
+      apply nat_sub_equal. apply H3.
+  - eapply hoare_consequence_pre. 
+    + apply hoare_asgn.
+    + intros st H. unfold bassn, assn_sub, t_update, assert_implies. simpl. reflexivity.
+Qed.
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
