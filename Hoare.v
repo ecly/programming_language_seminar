@@ -1481,18 +1481,25 @@ Inductive ceval : state -> com -> state -> Prop :=
       ceval st c1 st' ->
       ceval st' (WHILE b1 DO c1 END) st'' ->
       ceval st (WHILE b1 DO c1 END) st''
-(* FILL IN HERE *)
-.
+  | E_RepeatEnd : forall st st' b1 c1,
+      ceval st c1 st' ->
+      beval st' b1 = true ->
+      ceval st (REPEAT c1 UNTIL b1 END) st'
+  | E_RepeatLoop : forall st st' st'' b1 c1,
+      ceval st c1 st' ->
+      beval st' b1 = false ->
+      ceval st' (REPEAT c1 UNTIL b1 END) st'' ->
+      ceval st (REPEAT c1 UNTIL b1 END) st''.
 
 (** A couple of definitions from above, copied here so they use the
-    new [ceval]. *)
+  new [ceval]. *)
 
 Notation "c1 '/' st '\\' st'" := (ceval st c1 st')
-                                 (at level 40, st at level 39).
+                                (at level 40, st at level 39).
 
 Definition hoare_triple (P:Assertion) (c:com) (Q:Assertion)
-                        : Prop :=
-  forall st st', (c / st \\ st') -> P st -> Q st'.
+                      : Prop :=
+forall st st', (c / st \\ st') -> P st -> Q st'.
 
 Notation "{{ P }}  c  {{ Q }}" :=
   (hoare_triple P c Q) (at level 90, c at next level).
@@ -1509,13 +1516,28 @@ Definition ex1_repeat :=
 Theorem ex1_repeat_works :
   ex1_repeat / { --> 0 } \\ { X --> 1 ; Y --> 1 }.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  unfold ex1_repeat. 
+  apply E_RepeatEnd.
+  - eapply E_Seq; apply E_Ass; reflexivity.
+  - reflexivity.
+Qed.
 
 (** Now state and prove a theorem, [hoare_repeat], that expresses an
     appropriate proof rule for [repeat] commands.  Use [hoare_while]
     as a model, and try to make your rule as precise as possible. *)
 
-(* FILL IN HERE *)
+Theorem hoare_repeat : forall P c b, 
+    {{ P }} c {{ P }} ->
+    {{ P }} REPEAT c UNTIL b END {{ fun st => P st /\ bassn b st }}.
+Proof. 
+  intros P c b H st st' Hc Hp.
+  remember (REPEAT c UNTIL b END) as rcom eqn:Heqrcom.
+  induction Hc; inversion Heqrcom; subst; clear Heqrcom. 
+  - split. eapply H. apply Hc. apply Hp. apply H0.
+  - apply IHHc2. 
+    + reflexivity. 
+    + eapply H. apply Hc1. apply Hp.
+Qed. 
 
 (** For full credit, make sure (informally) that your rule can be used
     to prove the following valid Hoare triple:
