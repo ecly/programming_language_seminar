@@ -736,7 +736,6 @@ Definition bool_step_prop2 :=
   ==>
      ttrue.
 (** Not provable, not a single step *)
-(* FILL IN HERE *)
 
 Definition bool_step_prop3 :=
      tif
@@ -748,8 +747,10 @@ Definition bool_step_prop3 :=
        ttrue
        (tif ttrue ttrue ttrue)
        tfalse.
-
-(* FILL IN HERE *)
+Example bool_step_prop3_provable : bool_step_prop3.
+Proof.
+  apply ST_If. apply ST_IfTrue.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, optional (progress_bool)  *)
@@ -801,8 +802,9 @@ Inductive step : tm -> tm -> Prop :=
   | ST_If : forall t1 t1' t2 t3,
       t1 ==> t1' ->
       tif t1 t2 t3 ==> tif t1' t2 t3
-  (* FILL IN HERE *)
-
+  | ST_ShortCircuit : forall t1 t2,
+      tif t1 t2 t2 ==> t2
+      
   where " t '==>' t' " := (step t t').
 
 Definition bool_step_prop4 :=
@@ -816,7 +818,8 @@ Definition bool_step_prop4 :=
 Example bool_step_prop4_holds :
   bool_step_prop4.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  constructor.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, optional (properties_of_altered_step)  *)
@@ -989,8 +992,7 @@ Proof.
 (** **** Exercise: 1 star, optional (test_multistep_2)  *)
 Lemma test_multistep_2:
   C 3 ==>* C 3.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. repeat constructor. Qed.
 (** [] *)
 
 (** **** Exercise: 1 star, optional (test_multistep_3)  *)
@@ -998,8 +1000,7 @@ Lemma test_multistep_3:
       P (C 0) (C 3)
    ==>*
       P (C 0) (C 3).
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. repeat constructor. Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars (test_multistep_4)  *)
@@ -1014,7 +1015,14 @@ Lemma test_multistep_4:
         (C 0)
         (C (2 + (0 + 3))).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  eapply multi_step.
+  - apply ST_Plus2.
+    + apply v_const.
+    + apply ST_Plus2. apply v_const. apply ST_PlusConstConst.
+  - eapply multi_step.
+    + apply ST_Plus2. apply v_const. apply ST_PlusConstConst.
+    + apply multi_refl.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -1082,7 +1090,12 @@ Lemma multistep_congr_2 : forall t1 t2 t2',
      t2 ==>* t2' ->
      P t1 t2 ==>* P t1 t2'.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros t1 t2 t2' V H. induction H.
+  - apply multi_refl.
+  - apply multi_step with (P t1 y).
+    + apply ST_Plus2. apply V. apply H.
+    + apply IHmulti.
+Qed.
 (** [] *)
 
 (** With these lemmas in hand, the main proof is a straightforward
@@ -1188,7 +1201,15 @@ Theorem eval__multistep : forall t n,
     includes [==>]. *)
 
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  induction H.
+  - apply multi_refl.
+  - apply multi_trans with (P (C n1) t2).
+    + apply multistep_congr_1. apply IHeval1.
+    + apply multi_trans with (P (C n1) (C n2)).
+      * apply multistep_congr_2. apply v_const. apply IHeval2.
+      * apply multi_R. constructor.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (eval__multistep_inf)  *)
