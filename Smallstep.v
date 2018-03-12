@@ -198,7 +198,8 @@ Example test_step_2 :
           (C 2)
           (C (0 + 3))).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply ST_Plus2. apply ST_Plus2. apply ST_PlusConstConst.
+Qed.
 (** [] *)
 
 End SimpleArith1.
@@ -456,7 +457,19 @@ Inductive step : tm -> tm -> Prop :=
 Theorem step_deterministic :
   deterministic step.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  unfold deterministic. intros.
+  generalize dependent y2.
+  induction H.
+  - intros y2 H0. inversion H0; try solve_by_invert. reflexivity.
+  - intros y2 H0. inversion H0; subst.
+    + inversion H.
+    + apply IHstep in H4. rewrite H4. reflexivity.
+    + inversion H3. rewrite <- H1 in H. inversion H.
+  - intros y2 H1. inversion H1; subst.
+    + inversion H0.
+    + inversion H. rewrite <- H2 in H5. inversion H5.
+    + apply IHstep in H6. rewrite H6. reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -599,6 +612,9 @@ Inductive step : tm -> tm -> Prop :=
 Lemma value_not_same_as_normal_form :
   exists v, value v /\ ~ normal_form step v.
 Proof.
+  exists (P (C 1) (C 2)). split. 
+  - apply v_funny.
+  - unfold normal_form.  
   (* FILL IN HERE *) Admitted.
 End Temp1.
 
@@ -710,8 +726,7 @@ Inductive step : tm -> tm -> Prop :=
 
 Definition bool_step_prop1 :=
   tfalse ==> tfalse.
-
-(* FILL IN HERE *)
+(** Not provable, no step from value *)
 
 Definition bool_step_prop2 :=
      tif
@@ -720,7 +735,7 @@ Definition bool_step_prop2 :=
        (tif tfalse tfalse tfalse)
   ==>
      ttrue.
-
+(** Not provable, not a single step *)
 (* FILL IN HERE *)
 
 Definition bool_step_prop3 :=
