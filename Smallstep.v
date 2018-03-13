@@ -1215,9 +1215,30 @@ Qed.
 (** **** Exercise: 3 stars, advanced (eval__multistep_inf)  *)
 (** Write a detailed informal version of the proof of [eval__multistep].
 
-(* FILL IN HERE *)
+From the theorem we are given the following hypothesis
+
+  H: t \\ n
+
+  By induction on H, we need to prove our base case:
+
+    IHn: C n ==>* C n 
+
+  Which is trivial given our definition of multi step.
+  Then we need to prove:
+
+    P t1 t2 ==>* C (n1 + n2)
+
+  From IHn we already know that:
+    t1 ==>* C n1
+    t2 ==>* C n2
+
+    And such, given the definition of step, hereunder
+    ST_PlusConstConst, we naturally get that 
+
+    P t1 t2  ==>* C (n1 + n2)
+
+  Which is what we had to prove.
 *)
-(** [] *)
 
 (** For the other direction, we need one lemma, which establishes a
     relation between single-step reduction and big-step evaluation. *)
@@ -1229,7 +1250,11 @@ Lemma step__eval : forall t t' n,
      t \\ n.
 Proof.
   intros t t' n Hs. generalize dependent n.
-  (* FILL IN HERE *) Admitted.
+  induction Hs; intros; inversion H; subst.
+  - repeat constructor. 
+  - repeat constructor. apply IHHs. assumption. assumption.
+  - inversion H0. constructor. assumption. apply IHHs. assumption.
+Qed.
 (** [] *)
 
 (** The fact that small-step reduction implies big-step evaluation is
@@ -1245,7 +1270,16 @@ Proof.
 Theorem multistep__eval : forall t t',
   normal_form_of t t' -> exists n, t' = C n /\ t \\ n.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. induction H. 
+  rewrite nf_same_as_value in H0. inversion H0. 
+  exists n. split.
+  - reflexivity.
+  - induction H; subst.
+    + constructor.
+    + subst. eapply step__eval. apply H. apply IHmulti. 
+      * assumption. 
+      * reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
