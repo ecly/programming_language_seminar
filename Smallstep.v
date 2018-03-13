@@ -1315,14 +1315,41 @@ Inductive step : tm -> tm -> Prop :=
     language.  (That is, state a theorem saying that the property
     holds or does not hold, and prove your theorem.) *)
 
-(* FILL IN HERE *)
+Theorem value_cannot_step : forall t t', value t -> t ==> t' -> False.
+Proof.
+  intros. inversion H as [n H1|H1|H1]; inversion H1; rewrite <- H1 in H0; inversion H0.
+Qed.
+
+Theorem combined_deterministic : deterministic step.
+Proof.
+  unfold deterministic. intros. generalize dependent y2.
+  induction H; intros y2 H1; inversion H1; subst; try easy.
+  - apply IHstep in H4. rewrite H4. reflexivity.
+  - apply (value_cannot_step t1 t1' H3) in H. contradiction.
+  - apply (value_cannot_step v1 t1' H) in H5. contradiction.
+  - apply IHstep in H6. rewrite H6. reflexivity.
+  - apply IHstep in H5. rewrite H5. reflexivity.
+Qed.
+
+Theorem not_or : forall a b, ~a /\ ~b -> (~(a \/ b)).
+Proof. 
+  intros. destruct H. unfold not. intros. destruct H1; contradiction.
+Qed.
+
+Theorem not_combined_strong_progress : exists t,
+  ~(value t \/ (exists t', t ==> t')).
+Proof.
+  intros. exists (P tfalse ttrue). apply not_or. split.
+  - intros contra. inversion contra.
+  - intros H. destruct H. inversion H; subst; solve_by_invert.
+Qed.
 
 End Combined.
 (** [] *)
 
 (* ################################################################# *)
 (** * Small-Step Imp *)
-
+ 
 (** Now for a more serious example: a small-step version of the Imp
     operational semantics. *)
 
@@ -1712,15 +1739,34 @@ Definition stack_multistep st := multi (stack_step st).
     [Imp] chapter of _Logical Foundations_. We want now to
     prove [compile] correct with respect to the stack machine.
 
-    State what it means for the compiler to be correct according to
+    State what it means for the compiler tststo be correct according to
     the stack machine small step semantics and then prove it. *)
-
-Definition compiler_is_correct_statement : Prop 
-  (* REPLACE THIS LINE WITH ":= _your_definition_ ." *). Admitted.
+Check s_compile.
+Print aexp.
+Definition compiler_is_correct_statement : Prop := forall state e stk prog,
+  stack_multistep state (s_compile e++prog, stk) (prog, aeval state e::stk).
 
 Theorem compiler_is_correct : compiler_is_correct_statement.
 Proof.
-(* FILL IN HERE *) Admitted.
+  unfold compiler_is_correct_statement. intros state e. induction e; simpl; intros stk prog.
+  - apply multi_R. apply SS_Push. 
+  - apply multi_R. apply SS_Load.
+  - apply multi_trans with (s_compile e2++[SPlus]++prog, aeval state e1::stk).
+    + repeat rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with (SPlus::prog, aeval state e2 :: aeval state e1 :: stk).
+      * apply IHe2.
+      * apply multi_R. apply SS_Plus.
+  - apply multi_trans with (s_compile e2++[SMinus]++prog, aeval state e1::stk).
+    + repeat rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with (SMinus::prog, aeval state e2 :: aeval state e1 :: stk).
+      * apply IHe2.
+      * apply multi_R. apply SS_Minus.
+  - apply multi_trans with (s_compile e2++[SMult]++prog, aeval state e1::stk).
+    + repeat rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with (SMult::prog, aeval state e2::aeval state e1::stk).
+      * apply IHe2.
+      * apply multi_R. apply SS_Mult.
+Qed.
 (** [] *)
 
 
