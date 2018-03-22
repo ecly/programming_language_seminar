@@ -453,6 +453,13 @@ Qed.
 (** The second critical property of typing is that, when a well-typed
     term takes a step, the result is also a well-typed term. *)
 
+Theorem nvalue_tnat : forall t, nvalue t -> |- t \in TNat.
+Proof.
+  intros. induction H.
+  - apply T_Zero.
+  - apply T_Succ. apply IHnvalue.
+Qed.
+
 (** **** Exercise: 2 stars (finish_preservation)  *)
 Theorem preservation : forall t t' T,
   |- t \in T ->
@@ -477,7 +484,16 @@ Proof with auto.
       + (* ST_IfFalse *) assumption.
       + (* ST_If *) apply T_If; try assumption.
         apply IHHT1; assumption.
-    (* FILL IN HERE *) Admitted.
+    - inversion HE; subst. apply T_Succ. apply IHHT. assumption.
+    - inversion HE; subst.
+      + assumption.
+      + apply nvalue_tnat. assumption.
+      + apply T_Pred. apply IHHT.  assumption.
+    - inversion HE; subst.
+       + apply T_True.
+       + apply T_False.
+       + apply T_Iszero. apply IHHT. assumption.
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_preservation_informal)  *)
@@ -524,7 +540,18 @@ Theorem preservation' : forall t t' T,
   t ==> t' ->
   |- t' \in T.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
+  intros. generalize dependent T. induction H0; intros T H'; inversion H'; subst.
+  - assumption.
+  - assumption.
+  - apply T_If. { apply IHstep. assumption. } assumption. assumption.
+  - apply T_Succ. apply IHstep. assumption.
+  - apply T_Zero.
+  - apply nvalue_tnat. assumption.
+  - apply T_Pred. apply IHstep. assumption.
+  - apply T_True.
+  - apply T_False.
+  - apply T_Iszero. apply IHstep. assumption.
+Qed.
 (** [] *)
 
 (** The preservation theorem is often called _subject reduction_,
@@ -641,7 +668,8 @@ Theorem normalize_ex : exists e',
   (P (C 3) (P (C 2) (C 1))) 
   ==>* e'.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  eapply ex_intro. normalize.
+Qed.
 (** [] *)
 
 (** **** Exercise: 1 star, optional (normalize_ex')  *)
@@ -673,9 +701,15 @@ Tactic Notation "normalize" :=
     and [|- t' \in T], then [|- t \in T]?  If so, prove it.  If
     not, give a counter-example.  (You do not need to prove your
     counter-example in Coq, but feel free to do so.)
-
-    (* FILL IN HERE *)
 *)
+
+Theorem subject_expansion_counter : exists t t' T, t ==> t' /\ |- t' \in T /\ ~(|- t \in T).
+Proof.
+  exists (tif ttrue tzero ttrue). exists tzero. exists TNat. repeat split.
+  - constructor.
+  - constructor. 
+  - intros contra. inversion contra. subst. inversion H5.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars (variation1)  *)
@@ -690,12 +724,11 @@ Tactic Notation "normalize" :=
    else "becomes false." If a property becomes false, give a
    counterexample.
       - Determinism of [step]
-
+        remains true
       - Progress
-
+        becomes false, (tsucc ttrue) is not a bvalue.
       - Preservation
-
-
+        remains true
     [] *)
 
 (** **** Exercise: 2 stars (variation2)  *)
@@ -706,8 +739,7 @@ Tactic Notation "normalize" :=
 
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-
-
+   - Determinism, (tif ttrue tzero (tsucc tzero)) could step to both branches.
     [] *)
 
 (** **** Exercise: 2 stars, optional (variation3)  *)
@@ -774,10 +806,9 @@ Tactic Notation "normalize" :=
     achieve this simply by removing the rule from the definition of
     [step]?  Would doing so create any problems elsewhere?
 
-(* FILL IN HERE *)
+    (TPred 0) is not a value, so removing the rule would make Progress false.
 *)
-(** [] *)
-
+    
 (** **** Exercise: 4 stars, advanced (prog_pres_bigstep)  *)
 (** Suppose our evaluation relation is defined in the big-step style.
     State appropriate analogs of the progress and preservation
@@ -787,9 +818,8 @@ Tactic Notation "normalize" :=
     Do they allow for nonterminating commands?
     Why might we prefer the small-step semantics for stating
     preservation and progress?
-
-(* FILL IN HERE *)
 *)
+
 (** [] *)
 
 (** $Date: 2017-11-21 12:43:02 -0500 (Tue, 21 Nov 2017) $ *)
