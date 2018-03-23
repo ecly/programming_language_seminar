@@ -437,8 +437,6 @@ Qed.
 
             - If [t1] itself can take a step, then, by [ST_If], so can
               [t].
-
-      - (* FILL IN HERE *)
  *)
 (** [] *)
 
@@ -522,8 +520,6 @@ Qed.
              else t3], where [t1 ==> t1'].  We know [|- t1 \in Bool] so,
              by the IH, [|- t1' \in Bool].  The [T_If] rule then gives us
              [|- if t1' then t2 else t3 \in T], as required.
-
-      - (* FILL IN HERE *)
 *)
 (** [] *)
 
@@ -679,7 +675,8 @@ Theorem normalize_ex' : exists e',
   (P (C 3) (P (C 2) (C 1))) 
   ==>* e'.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply ex_intro with (C 6). normalize.
+Qed.
 (** [] *)
 
 End NormalizePlayground.
@@ -814,10 +811,15 @@ Qed.
     State appropriate analogs of the progress and preservation
     properties. (You do not need to prove them.)
 
-    Can you see any limitations of either of your properties?
-    Do they allow for nonterminating commands?
-    Why might we prefer the small-step semantics for stating
-    preservation and progress?
+    For big step evaluation, if a term is well typed then it reduces
+    to a value.
+
+    |- t \in T -> value (teval t)
+
+    Similarly, a term that is well typed should always reduce 
+    to something well typed 
+
+    |- t \in T -> |- (teval t) \- in T
 *)
 
 (** [] *)
