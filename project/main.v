@@ -69,10 +69,33 @@ Hint Constructors subst_ind.
 Theorem subst_ind_correct : forall x s t t',
   [x:=s]t = t' <-> subst_ind x s t t'.
 Proof.
-  intros s x t t'. split.
-  - intros H. induction t.
-    + subst. destruct (string_dec s s0).
-      * subst. simpl. simpl. rewrite string_beq_refl. apply subst_var_eq.
-  (* FILL IN HERE *) Admitted.
-  
+  split.
+  - generalize dependent x0. generalize dependent s. generalize dependent t'.
+    induction t as [x'| |x'| | | ]; intros t' s x H; simpl in H.
+    + destruct (string_beq x x') eqn:res.
+      * rewrite string_beq_true_iff in res. subst. apply subst_var_eq.
+      * rewrite <- H. apply subst_var_neq. apply string_beq_false_iff. apply res.
+    + subst. apply subst_app.
+      * apply IHt1. reflexivity.
+      * apply IHt2. reflexivity.
+    + destruct (string_beq x x') eqn:res.
+      * rewrite string_beq_true_iff in res. subst. apply subst_abs_eq.
+      * rewrite <- H. rewrite string_beq_false_iff in res. apply subst_abs_neq. 
+        assumption. apply IHt. reflexivity.
+    + rewrite <- H. apply subst_true.
+    + rewrite <- H. apply subst_false.
+    + rewrite <- H. apply subst_if; auto.
+  - intros H. induction H; simpl.
+    + rewrite string_beq_refl. reflexivity.
+    + rewrite (string_beq_false x0 x' H). reflexivity.
+    + subst. reflexivity.
+    + rewrite string_beq_refl. reflexivity.
+    + subst. rewrite (string_beq_false x0 x' H). reflexivity.
+    + reflexivity.
+    + reflexivity.
+    + subst. reflexivity.
+Qed.
+
+
+
 End STLC.
