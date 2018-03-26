@@ -96,6 +96,41 @@ Proof.
     + subst. reflexivity.
 Qed.
 
+Reserved Notation "t1 '==>' t2" (at level 40).
+Inductive step : term -> term -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (t_app (t_abs x T t12) v2) ==> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 ==> t1' ->
+         t_app t1 t2 ==> t_app t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' ->
+         t_app v1 t2 ==> t_app v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (t_if t_true t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (t_if t_false t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (t_if t1 t2 t3) ==> (t_if t1' t2 t3)
 
+where "t1 '==>' t2" := (step t1 t2).
+Hint Constructors step.
 
+(* An arbitrary binary relation *)
+Definition relation (X: Type) := X -> X -> Prop.
+(* Defines the reflexivity and transitivity of the relations *)
+Inductive multi {X:Type} (R: relation X) : relation X :=
+  | multi_refl  : forall (x : X), multi R x x
+  | multi_step : forall (x y z : X),
+                    R x y ->
+                    multi R y z ->
+                    multi R x z.
+                    
+Notation multistep := (multi step).
+Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
+
+  
 End STLC.
