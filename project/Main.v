@@ -1,5 +1,9 @@
+Set Warnings "-notation-overridden".
+
 Require Import Coq.Strings.String.
-Require Import utils.
+
+Require Import Maps.
+Require Import Util.
 
 Module STLC.
 
@@ -132,5 +136,93 @@ Inductive multi {X:Type} (R: relation X) : relation X :=
 Notation multistep := (multi step).
 Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
+(** Typing *)
+Definition context := partial_map ty.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+Inductive has_type : context -> term -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- t_var x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      Gamma & {x --> T11} |- t12 \in T12 ->
+      Gamma |- t_abs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 ->
+      Gamma |- t2 \in T11 ->
+      Gamma |- t_app t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- t_true \in TBool
+  | T_False : forall Gamma,
+       Gamma |- t_false \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- t_if t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+Hint Constructors has_type.
+
+(** Lemmas stating the canonical form of boolean and arrow types *)
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = t_true) \/ (t = t_false).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = t_abs x T1 u.
+Proof.
+  intros t T1 T2 HT HVal.
+  inversion HVal; intros; subst; try inversion HT; subst; auto.
+  exists x0. exists t0.  auto.
+Qed.
+
+(** A well-typed term can always take a smallstep if it is not a value *)  
+Theorem progress : forall t T,
+  empty |- t \in T ->
+  value t \/ exists t', t ==> t'.
+Proof with eauto.
+  intros t T Ht.
+  remember (@empty ty) as Gamma.
+  induction Ht; subst Gamma...
+  - (* T_Var *)
+    (* contradictory: variables cannot be typed in an
+       empty context *)
+    inversion H.
+
+  - (* T_App *)
+    (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a
+       value or steps... *)
+    right. destruct IHHt1...
+    + (* t1 is a value *)
+      destruct IHHt2...
+      * (* t2 is also a value *)
+        assert (exists x0 t0, t1 = t_abs x0 T11 t0).
+        eapply canonical_forms_fun; eauto.
+        destruct H1 as [x0 [t0 Heq]]. subst.
+        exists ([x0:=t2]t0)...
+
+      * (* t2 steps *)
+        inversion H0 as [t2' Hstp]. exists (t_app t1 t2')...
+
+    + (* t1 steps *)
+      inversion H as [t1' Hstp]. exists (t_app t1' t2)...
+
+  - (* T_If *)
+    right. destruct IHHt1...
+
+    + (* t1 is a value *)
+      destruct (canonical_forms_bool t1); subst; eauto.
+
+    + (* t1 also steps *)
+      inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
+Qed.
   
 End STLC.

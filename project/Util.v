@@ -10,13 +10,6 @@ Proof.
  - contradiction.
 Qed.
 
-Lemma string_beq_false : forall s s', s <> s' -> string_beq s s' = false.
-Proof.
-  intros. unfold string_beq. destruct (string_dec s s').
-  - unfold not in H. rewrite e in H. contradiction.
-  - reflexivity.
-Qed.
-
 Lemma string_beq_true_iff : forall x y : string,
   string_beq x y = true <-> x = y.
 Proof.
@@ -32,4 +25,9 @@ Qed.
 Lemma string_beq_false_iff : forall x y : string, string_beq x y = false <-> x <> y.
 Proof.
   intros. rewrite <- string_beq_true_iff. rewrite not_true_iff_false. reflexivity.
+Qed.
+
+Lemma string_beq_false : forall s s', s <> s' -> string_beq s s' = false.
+Proof.
+  apply string_beq_false_iff.
 Qed.
