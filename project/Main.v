@@ -196,7 +196,6 @@ Proof with eauto.
     (* contradictory: variables cannot be typed in an
        empty context *)
     inversion H.
-
   - (* T_App *)
     (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a
        value or steps... *)
@@ -208,21 +207,176 @@ Proof with eauto.
         eapply canonical_forms_fun; eauto.
         destruct H1 as [x0 [t0 Heq]]. subst.
         exists ([x0:=t2]t0)...
-
       * (* t2 steps *)
         inversion H0 as [t2' Hstp]. exists (t_app t1 t2')...
-
     + (* t1 steps *)
       inversion H as [t1' Hstp]. exists (t_app t1' t2)...
-
   - (* T_If *)
     right. destruct IHHt1...
-
     + (* t1 is a value *)
       destruct (canonical_forms_bool t1); subst; eauto.
-
     + (* t1 also steps *)
       inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
 Qed.
+
+(** Defines that a variable appears free in a term. *)  
+Inductive appears_free_in : string -> term -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (t_var x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> 
+      appears_free_in x (t_app t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> 
+      appears_free_in x (t_app t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (t_abs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (t_if t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (t_if t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (t_if t1 t2 t3).
+Hint Constructors appears_free_in.
   
+(** A closed term is one that does not contain any free variables *)
+Definition closed (t:term) :=
+  forall x, ~ appears_free_in x t.
+
+(** If there is a free variable in a well-typed term, it must exist in the context *)
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma.
+  generalize dependent T.
+  induction H;
+         intros; try solve [inversion H0; eauto].
+  - (* afi_abs *)
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite partial_map_apply_neq in H7; assumption.
+Qed. 
+
+(** If a term is well-typed without any bound variables, it must be closed *)
+Corollary typable_empty_closed : forall t T,
+    empty |- t \in T  ->
+    closed t.
+Proof.
+  unfold closed. intros t T H x H1. eapply free_in_context in H.
+  - inversion H. inversion H0.
+  - apply H1.
+Qed.
+
+(** A context can be swapped with another if they both bind all free variables in the same way *)
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros.
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+  - (* T_Var *)
+    apply T_Var. rewrite <- H0...
+  - (* T_Abs *)
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to
+       instantiate is [Gamma & {{x-->T11}}] *)
+    unfold update. destruct (string_beq x0 x1) eqn: Hx0x1...
+    rewrite string_beq_false_iff in Hx0x1. auto.
+  - (* T_App *)
+    apply T_App with T11...
+Qed.
+
+(** If a term has one time, it cannot have another *)
+Lemma type_unique : forall t T U Gamma, Gamma |- t \in T -> Gamma |- t \in U -> T = U.
+Proof.
+  induction t; intros; inversion H; inversion H0; subst.
+  - rewrite H3 in H7. inversion H7. reflexivity.
+  - assert (T11 = T0). { eapply IHt2. apply H6. apply H12. } subst. 
+    assert (TArrow T0 T = TArrow T0 U). { eapply IHt1. apply H4. apply H10. }
+    inversion H1. reflexivity.
+  - assert (T12 = T1). { eapply IHt. apply H6. apply H12. } subst. reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - eapply IHt2. apply H7. apply H15.
+Qed.
+
+(** If a variable has a type U in the context of t, t can be substituted by a value of type U. *)
+Lemma substitution_preserves_typing : forall Gamma x U t v T,
+  Gamma & {x-->U} |- t \in T ->
+  empty |- v \in U   ->
+  Gamma |- [x:=v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T H H1.
+  generalize dependent Gamma. generalize dependent T.
+  
+  induction t; intros T Gamma H; inversion H; subst; simpl...
+  - destruct (string_beqP x s).
+    + subst. assert (Gamma & { s --> U} |- t_var s \in U). {
+        apply T_Var. apply partial_map_apply_eq.
+      }
+      assert (T = U). { eapply type_unique. apply H. apply H0. } subst.
+      eapply context_invariance in H1. apply H1. intros. apply typable_empty_closed in H1.
+      unfold closed in H1. destruct (H1 x0). apply H2.
+    + apply T_Var. rewrite partial_map_apply_neq in H3; assumption.
+  - (* tabs *)
+    rename s into y. rename t into T. apply T_Abs.
+    destruct (string_beqP x y) as [Hxy | Hxy].
+    + (* x=y *)
+      subst. rewrite partial_map_update_shadow in H6. apply H6.
+    + (* x<>y *)
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold update.
+      destruct (string_beqP y z) as [Hyz | Hyz]; subst; trivial.
+      rewrite <- string_beq_false_iff in Hxy.
+      rewrite Hxy...
+Qed.
+
+(** Taking a step preserves the type *)
+Theorem preservation : forall t t' T,
+  empty |- t \in T  ->
+  t ==> t'  ->
+  empty |- t' \in T.
+Proof with eauto.
+  remember (@empty ty) as Gamma.
+  intros t t' T HT. generalize dependent t'.
+  induction HT;
+       intros t' HE; subst Gamma; subst;
+       try solve [inversion HE; subst; auto].
+  - (* T_App *)
+    inversion HE; subst...
+    (* Most of the cases are immediate by induction,
+       and [eauto] takes care of them *)
+    + (* ST_AppAbs *)
+      apply substitution_preserves_typing with T11...
+      inversion HT1...
+Qed.
+
+(** A normal form i a term that cannot step any further *)
+Definition normal_form t : Prop := ~exists t', t ==> t'.
+
+Definition stuck (t:term) : Prop :=
+  (normal_form) t /\ ~ value t.
+  
+(** A well-typed term cannot be stuck *)
+Corollary soundness : forall t t' T,
+  empty |- t \in T ->
+  t ==>* t' ->
+  ~(stuck t').
+Proof.
+  intros t t' T Hhas_type Hmulti. unfold stuck.
+  intros [Hnf Hnot_val]. unfold normal_form in Hnf.
+  induction Hmulti.
+  (* FILL IN HERE *) Admitted.
+
+ 
 End STLC.

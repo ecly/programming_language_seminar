@@ -4,6 +4,7 @@ We'd rather keep the book notation.
 *)
 
 Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Strings.String.
 Require Import Util.
 
 Definition total_map (A:Type) := string -> A.
@@ -60,3 +61,8 @@ Proof.
     + reflexivity.
   - reflexivity.
 Qed.
+
+Lemma partial_map_update_shadow : forall A (m: partial_map A) v1 v2 x,
+    m & { x --> v1 ; x --> v2 } = m & {x --> v2}.
+Proof.
+Admitted.
