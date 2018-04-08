@@ -1,4 +1,5 @@
 Require Import Coq.Strings.String.
+
 Require Import Maps.
 Require Import Util.
 Require Import Main.
@@ -135,4 +136,51 @@ Proof.
     + rewrite <- H3. apply H1.
     + rewrite <- H3. apply H2.
     + rewrite <- H3. apply H0.
+Qed.
+
+Lemma progress_t_app : forall T t1 t2,
+  empty |- t_app t1 t2 \in T ->
+  (value t1 \/ exists t1', t1 ==> t1') ->
+  (value t2 \/ exists t2', t2 ==> t2') ->
+  exists t', t_app t1 t2 ==> t'.
+Proof.
+  intros. destruct H0.
+  - destruct H1.
+    + (* t1 and t2 are both values *)
+      inversion H0. subst.
+      * exists ([x0 := t2] t). apply ST_AppAbs. apply H1.
+      * inversion H. subst. inversion H6.
+      * inversion H. subst. inversion H6.
+    + destruct H1. exists (t_app t1 x0). constructor; assumption.
+  - (* t1 can step, t2 is a value *) 
+    destruct H0. exists (t_app x0 t2). constructor. assumption.
+Qed.
+
+(*--- StlcProp Section ---*)
+(** **** Exercise: 3 stars, advanced (progress_from_term_ind)  *)
+(** Show that progress can also be proved by induction on terms
+    instead of induction on typing derivations. *)
+
+Theorem progress' : forall t T,
+     empty |- t \in T ->
+     value t \/ exists t', t ==> t'.
+Proof.
+  intros t.
+  induction t; intros T Ht; auto.
+  - (* T_Var *)
+    inversion Ht.  inversion H1.
+  -  (* T_App *) 
+    right. inversion Ht. subst.
+    destruct IHt1 with (TArrow T11 T).
+    + destruct IHt2 with (T11); assumption.
+    + eapply progress_t_app. apply Ht. eapply IHt1. apply H2. eapply IHt2. apply H4.
+    + eapply progress_t_app. apply Ht. eapply IHt1. apply H2. eapply IHt2. apply H4.
+  - (* T_If *) 
+    inversion Ht. subst. right. 
+    destruct IHt1 with (T := TBool). apply H3.
+    apply canonical_forms_bool in H3. destruct H3; subst.
+    + eexists. apply ST_IfTrue.
+    + eexists. apply ST_IfFalse.
+    + apply H.
+    + destruct H. eexists. apply ST_If. apply H.
 Qed.
