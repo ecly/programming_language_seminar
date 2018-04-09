@@ -65,4 +65,6 @@ Qed.
 Lemma partial_map_update_shadow : forall A (m: partial_map A) v1 v2 x,
     m & { x --> v1 ; x --> v2 } = m & {x --> v2}.
 Proof.
-Admitted.
+  unfold update. intros. apply functional_extensionality. intros.
+  destruct (string_beq x x0); reflexivity.
+Qed.
