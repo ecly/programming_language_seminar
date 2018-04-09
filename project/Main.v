@@ -127,7 +127,7 @@ Hint Constructors step.
 Definition relation (X: Type) := X -> X -> Prop.
 (* Defines the reflexivity and transitivity of the relations *)
 Inductive multi {X:Type} (R: relation X) : relation X :=
-  e multi_refl  : forall (x : X), multi R x x
+  | multi_refl  : forall (x : X), multi R x x
   | multi_step : forall (x y z : X),
                     R x y ->
                     multi R y z ->
@@ -376,7 +376,11 @@ Proof.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  (* FILL IN HERE *) Admitted.
-
+  - destruct (progress x0 T Hhas_type); contradiction.
+  - apply IHHmulti.
+    + eapply preservation. apply Hhas_type. apply H.
+    + apply Hnf.
+    + apply Hnot_val.
+Qed.
  
 End STLC.
