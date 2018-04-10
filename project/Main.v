@@ -17,14 +17,11 @@ Inductive term : Type :=
   | t_abs : string -> ty -> term -> term
   | t_true : term
   | t_false : term
-  | t_if : term -> term -> term -> term.
+  | t_if : term -> term -> term -> term
+  | t_let : string -> term -> term -> term. (* let x:T = term in term *)
 
 (* Needed for string definitions *)  
 Open Scope string_scope.
-
-Definition x := "x". Hint Unfold x.
-Definition y := "y". Hint Unfold y.
-Definition z := "z". Hint Unfold z.
 
 Inductive value : term -> Prop :=
   | v_abs : forall x T t,
@@ -51,6 +48,8 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
       t_false
   | t_if t1 t2 t3 =>
       t_if ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  | t_let x' t1 t2 => 
+      t_let x' ([x:=s] t1) (if string_beq x x' then t2 else ([x:=s] t2))
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
@@ -66,16 +65,19 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_true : subst_ind x s t_true t_true
   | subst_false : subst_ind x s t_false t_false
   | subst_if : forall t1 t1' t2 t2' t3 t3', subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
-      subst_ind x s t3 t3' -> subst_ind x s (t_if t1 t2 t3) (t_if t1' t2' t3').
+      subst_ind x s t3 t3' -> subst_ind x s (t_if t1 t2 t3) (t_if t1' t2' t3')
+  | subst_let_eq : forall t1 t1' t2, subst_ind x s t1 t1' ->
+      subst_ind x s (t_let x t1 t2) (t_let x t1' t2)
+  | subst_let_neq : forall x' t1 t1' t2 t2', x <> x' -> subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
+      subst_ind x s (t_let x' t1 t2) (t_let x' t1' t2').
 Hint Constructors subst_ind.
-
  
 Theorem subst_ind_correct : forall x s t t',
   [x:=s]t = t' <-> subst_ind x s t t'.
 Proof.
   split.
-  - generalize dependent x0. generalize dependent s. generalize dependent t'.
-    induction t as [x'| |x'| | | ]; intros t' s x H; simpl in H.
+  - generalize dependent x. generalize dependent s. generalize dependent t'.
+    induction t as [x'| |x'| | | |x']; intros t' s x H; simpl in H.
     + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_var_eq.
       * rewrite <- H. apply subst_var_neq. apply string_beq_false_iff. apply res.
@@ -89,15 +91,25 @@ Proof.
     + rewrite <- H. apply subst_true.
     + rewrite <- H. apply subst_false.
     + rewrite <- H. apply subst_if; auto.
+    + rewrite <- H. destruct (string_beq x x') eqn:res.
+      * rewrite string_beq_true_iff in res. subst. apply subst_let_eq. apply IHt1. reflexivity.
+      * rewrite string_beq_false_iff in res. {
+        apply subst_let_neq. 
+        - apply res.
+        - apply IHt1. reflexivity.
+        - apply IHt2. reflexivity.
+      } 
   - intros H. induction H; simpl.
     + rewrite string_beq_refl. reflexivity.
-    + rewrite (string_beq_false x0 x' H). reflexivity.
+    + rewrite (string_beq_false x x' H). reflexivity.
     + subst. reflexivity.
     + rewrite string_beq_refl. reflexivity.
-    + subst. rewrite (string_beq_false x0 x' H). reflexivity.
+    + subst. rewrite (string_beq_false x x' H). reflexivity.
     + reflexivity.
     + reflexivity.
     + subst. reflexivity.
+    + subst. rewrite string_beq_refl. reflexivity.
+    + subst. rewrite (string_beq_false x x' H). reflexivity.
 Qed.
 
 Reserved Notation "t1 '==>' t2" (at level 40).
@@ -119,7 +131,8 @@ Inductive step : term -> term -> Prop :=
   | ST_If : forall t1 t1' t2 t3,
       t1 ==> t1' ->
       (t_if t1 t2 t3) ==> (t_if t1' t2 t3)
-
+  | ST_Let : forall x t1 t1' t2, t1 ==> t1' -> (t_let x t1 t2) ==> (t_let x t1' t2)
+  | ST_LetValue : forall x v1 t2, value v1 -> (t_let x v1 t2) ==> [x:=v1]t2
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 
@@ -160,6 +173,10 @@ Inductive has_type : context -> term -> ty -> Prop :=
        Gamma |- t2 \in T ->
        Gamma |- t3 \in T ->
        Gamma |- t_if t1 t2 t3 \in T
+  | T_Let : forall Gamma x t1 T1 t2 T,
+        Gamma |- t1 \in T1 ->
+        Gamma & {x --> T1} |- t2 \in T ->
+        Gamma |- t_let x t1 t2 \in T
 
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
 Hint Constructors has_type.
@@ -181,7 +198,7 @@ Lemma canonical_forms_fun : forall t T1 T2,
 Proof.
   intros t T1 T2 HT HVal.
   inversion HVal; intros; subst; try inversion HT; subst; auto.
-  exists x0. exists t0.  auto.
+  exists x. exists t0.  auto.
 Qed.
 
 (** A well-typed term can always take a smallstep if it is not a value *)  
@@ -217,6 +234,8 @@ Proof with eauto.
       destruct (canonical_forms_bool t1); subst; eauto.
     + (* t1 also steps *)
       inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
+  - (* T_Let *)
+    right. destruct IHHt1... destruct H. exists (t_let x x0 t2). apply ST_Let. apply H.
 Qed.
 
 (** Defines that a variable appears free in a term. *)  
@@ -241,7 +260,14 @@ Inductive appears_free_in : string -> term -> Prop :=
       appears_free_in x (t_if t1 t2 t3)
   | afi_if3 : forall x t1 t2 t3,
       appears_free_in x t3 ->
-      appears_free_in x (t_if t1 t2 t3).
+      appears_free_in x (t_if t1 t2 t3)
+  | afi_let1 : forall x y t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (t_let y t1 t2)
+  | afi_let2 : forall x y t1 t2,
+      y <> x ->
+      appears_free_in x t2 ->
+      appears_free_in x (t_let y t1 t2). 
 Hint Constructors appears_free_in.
   
 (** A closed term is one that does not contain any free variables *)
@@ -262,6 +288,8 @@ Proof.
     inversion H1; subst.
     apply IHappears_free_in in H7.
     rewrite partial_map_apply_neq in H7; assumption.
+  - inversion H1; subst. apply IHappears_free_in in H8.
+    rewrite partial_map_apply_neq in H8; assumption.
 Qed. 
 
 (** If a term is well-typed without any bound variables, it must be closed *)
@@ -290,10 +318,17 @@ Proof with eauto.
     apply IHhas_type. intros x1 Hafi.
     (* the only tricky step... the [Gamma'] we use to
        instantiate is [Gamma & {{x-->T11}}] *)
-    unfold update. destruct (string_beq x0 x1) eqn: Hx0x1...
+    unfold update. destruct (string_beq x x1) eqn: Hx0x1...
     rewrite string_beq_false_iff in Hx0x1. auto.
   - (* T_App *)
     apply T_App with T11...
+  - (* T_Let *)
+    eapply T_Let with T1.
+    + apply IHhas_type1. intros. apply H1. apply afi_let1. apply H2.
+    + apply IHhas_type2. intros. destruct (string_beq x x0) eqn:res.
+      * rewrite string_beq_true_iff in res. subst. repeat rewrite partial_map_apply_eq. reflexivity.
+      * rewrite string_beq_false_iff in res. repeat rewrite partial_map_apply_neq; try assumption.
+        apply H1. apply afi_let2; assumption.
 Qed.
 
 (** If a term has one time, it cannot have another *)
@@ -308,6 +343,8 @@ Proof.
   - reflexivity.
   - reflexivity.
   - eapply IHt2. apply H7. apply H15.
+  - (* T_Let *) assert (T1 = T2). { eapply IHt1. apply H6. apply H13. } subst.
+    eapply IHt2. apply H7. apply H14.
 Qed.
 
 (** If a variable has a type U in the context of t, t can be substituted by a value of type U. *)
@@ -326,7 +363,7 @@ Proof with eauto.
       }
       assert (T = U). { eapply type_unique. apply H. apply H0. } subst.
       eapply context_invariance in H1. apply H1. intros. apply typable_empty_closed in H1.
-      unfold closed in H1. destruct (H1 x0). apply H2.
+      unfold closed in H1. destruct (H1 x). apply H2.
     + apply T_Var. rewrite partial_map_apply_neq in H3; assumption.
   - (* tabs *)
     rename s into y. rename t into T. apply T_Abs.
@@ -339,6 +376,11 @@ Proof with eauto.
       destruct (string_beqP y z) as [Hyz | Hyz]; subst; trivial.
       rewrite <- string_beq_false_iff in Hxy.
       rewrite Hxy...
+  - (* t_let *) eapply T_Let. 
+    + apply IHt1. apply H6. 
+    + destruct (string_beqP x s).
+      * subst. rewrite partial_map_update_shadow in H7. apply H7.
+      * apply IHt2. rewrite partial_map_update_permute; assumption.
 Qed.
 
 (** Taking a step preserves the type *)
@@ -359,6 +401,12 @@ Proof with eauto.
     + (* ST_AppAbs *)
       apply substitution_preserves_typing with T11...
       inversion HT1...
+  - (* T_Let *)
+    inversion HE; subst.
+    + eapply T_Let.
+      * apply IHHT1. reflexivity. apply H3.
+      * apply HT2.
+    + eapply substitution_preserves_typing. apply HT2. apply HT1.
 Qed.
 
 (** A normal form i a term that cannot step any further *)
@@ -376,7 +424,7 @@ Proof.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  - destruct (progress x0 T Hhas_type); contradiction.
+  - destruct (progress x T Hhas_type); contradiction.
   - apply IHHmulti.
     + eapply preservation. apply Hhas_type. apply H.
     + apply Hnf.
