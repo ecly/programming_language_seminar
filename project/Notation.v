@@ -31,6 +31,9 @@ Notation "'ffalse'" :=
   t_false : notation_scope.
 Notation "'IFB' b 'THEN' t1 'ELSE' t2" :=
   (t_if b t1 t2) (at level 80, right associativity) : notation_scope.
+Notation "'LET' a \= t1 'IN' t2" :=
+  (t_let a t1 t2) (at level 80, right associativity) : notation_scope.
+
 
 (** The following declaration is needed to be able to use the
     notations in match patterns. *)
@@ -63,10 +66,16 @@ Proof.
     unfold nested_ifb_notation. normalize. 
 Qed.
 
+Definition let_notation : term :=
+  LET X \= t_true IN t_false.
 
+Example let_notation_test :
+  let_notation ==>* t_false.
+Proof.
+    unfold let_notation. normalize. 
+Qed.
 
 Definition test_notation_scope1 : term :=
   IFB ttrue THEN ffalse ELSE ttrue ; t_true.
 
 Definition asd : term := t_abs "x" TBool t_true.
-
