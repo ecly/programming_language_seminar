@@ -18,7 +18,8 @@ Inductive term : Type :=
   | t_true : term
   | t_false : term
   | t_if : term -> term -> term -> term
-  | t_let : string -> term -> term -> term. (* let x:T = term in term *)
+  | t_let : string -> term -> term -> term (* let x:T = term in term *)
+  | t_fix : term -> term.
 
 (* Needed for string definitions *)  
 Open Scope string_scope.
@@ -50,6 +51,8 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
       t_if ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
   | t_let x' t1 t2 => 
       t_let x' ([x:=s] t1) (if string_beq x x' then t2 else ([x:=s] t2))
+  | t_fix t1 => 
+      t_fix (subst x s t1)
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
@@ -69,7 +72,8 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_let_eq : forall t1 t1' t2, subst_ind x s t1 t1' ->
       subst_ind x s (t_let x t1 t2) (t_let x t1' t2)
   | subst_let_neq : forall x' t1 t1' t2 t2', x <> x' -> subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
-      subst_ind x s (t_let x' t1 t2) (t_let x' t1' t2').
+      subst_ind x s (t_let x' t1 t2) (t_let x' t1' t2')
+  | subst_fix : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_fix t1) (t_fix t1').
 Hint Constructors subst_ind.
  
 Theorem subst_ind_correct : forall x s t t',
@@ -77,7 +81,7 @@ Theorem subst_ind_correct : forall x s t t',
 Proof.
   split.
   - generalize dependent x. generalize dependent s. generalize dependent t'.
-    induction t as [x'| |x'| | | |x']; intros t' s x H; simpl in H.
+    induction t as [x'| |x'| | | |x'|x']; intros t' s x H; simpl in H.
     + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_var_eq.
       * rewrite <- H. apply subst_var_neq. apply string_beq_false_iff. apply res.
@@ -99,6 +103,7 @@ Proof.
         - apply IHt1. reflexivity.
         - apply IHt2. reflexivity.
       } 
+    + rewrite <- H. apply subst_fix. apply IHx'. reflexivity.
   - intros H. induction H; simpl.
     + rewrite string_beq_refl. reflexivity.
     + rewrite (string_beq_false x x' H). reflexivity.
@@ -110,6 +115,7 @@ Proof.
     + subst. reflexivity.
     + subst. rewrite string_beq_refl. reflexivity.
     + subst. rewrite (string_beq_false x x' H). reflexivity.
+    + subst. reflexivity.
 Qed.
 
 Reserved Notation "t1 '==>' t2" (at level 40).
@@ -133,6 +139,8 @@ Inductive step : term -> term -> Prop :=
       (t_if t1 t2 t3) ==> (t_if t1' t2 t3)
   | ST_Let : forall x t1 t1' t2, t1 ==> t1' -> (t_let x t1 t2) ==> (t_let x t1' t2)
   | ST_LetValue : forall x v1 t2, value v1 -> (t_let x v1 t2) ==> [x:=v1]t2
+  | ST_Fix1 : forall t1 t1', t_fix t1 ==> t_fix t1'
+  | ST_FixAbs : forall x T t1, t_fix (t_abs x T t1) ==> [x:=t_fix(t_abs x T t1)]t1
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 
@@ -177,6 +185,9 @@ Inductive has_type : context -> term -> ty -> Prop :=
         Gamma |- t1 \in T1 ->
         Gamma & {x --> T1} |- t2 \in T ->
         Gamma |- t_let x t1 t2 \in T
+  | T_Fix : forall Gamma t1 T1,
+        Gamma |- t1 \in TArrow T1 T1 ->
+        Gamma |- t_fix t1 \in T1
 
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
 Hint Constructors has_type.
@@ -208,11 +219,12 @@ Theorem progress : forall t T,
 Proof with eauto.
   intros t T Ht.
   remember (@empty ty) as Gamma.
-  induction Ht; subst Gamma...
+  induction Ht; subst Gamma.
   - (* T_Var *)
     (* contradictory: variables cannot be typed in an
        empty context *)
     inversion H.
+  - auto.
   - (* T_App *)
     (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a
        value or steps... *)
@@ -228,6 +240,8 @@ Proof with eauto.
         inversion H0 as [t2' Hstp]. exists (t_app t1 t2')...
     + (* t1 steps *)
       inversion H as [t1' Hstp]. exists (t_app t1' t2)...
+  - auto.
+  - auto.
   - (* T_If *)
     right. destruct IHHt1...
     + (* t1 is a value *)
@@ -236,7 +250,9 @@ Proof with eauto.
       inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
   - (* T_Let *)
     right. destruct IHHt1... destruct H. exists (t_let x x0 t2). apply ST_Let. apply H.
-Qed.
+  - 
+    right. destruct IHHt...
+Qed. 
 
 (** Defines that a variable appears free in a term. *)  
 Inductive appears_free_in : string -> term -> Prop :=
@@ -267,7 +283,10 @@ Inductive appears_free_in : string -> term -> Prop :=
   | afi_let2 : forall x y t1 t2,
       y <> x ->
       appears_free_in x t2 ->
-      appears_free_in x (t_let y t1 t2). 
+      appears_free_in x (t_let y t1 t2)
+  | afi_fix : forall x t1,
+      appears_free_in x t1 ->
+      appears_free_in x (t_fix t1).
 Hint Constructors appears_free_in.
   
 (** A closed term is one that does not contain any free variables *)
@@ -331,7 +350,7 @@ Proof with eauto.
         apply H1. apply afi_let2; assumption.
 Qed.
 
-(** If a term has one time, it cannot have another *)
+(** If a term has one type, it cannot have another *)
 Lemma type_unique : forall t T U Gamma, Gamma |- t \in T -> Gamma |- t \in U -> T = U.
 Proof.
   induction t; intros; inversion H; inversion H0; subst.
@@ -345,6 +364,8 @@ Proof.
   - eapply IHt2. apply H7. apply H15.
   - (* T_Let *) assert (T1 = T2). { eapply IHt1. apply H6. apply H13. } subst.
     eapply IHt2. apply H7. apply H14.
+  - assert (TArrow T T = TArrow U U). {eapply IHt. apply H3. apply H7. }
+    inversion H1. reflexivity.
 Qed.
 
 (** If a variable has a type U in the context of t, t can be substituted by a value of type U. *)
@@ -407,6 +428,15 @@ Proof with eauto.
       * apply IHHT1. reflexivity. apply H3.
       * apply HT2.
     + eapply substitution_preserves_typing. apply HT2. apply HT1.
+  - (* T_Fix *)
+    inversion HT...
+    + subst. eapply substitution_preserves_typing. 
+    eapply substitution_preserves_typing with T1.
+
+    inversion HE.
+    + eapply T_Fix. 
+      * apply IHHT. reflexivity. 
+      * 
 Qed.
 
 (** A normal form i a term that cannot step any further *)
