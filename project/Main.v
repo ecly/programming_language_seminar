@@ -1,9 +1,23 @@
 Set Warnings "-notation-overridden".
 
 Require Import Coq.Strings.String.
+Require Import Coq.Arith.Arith.
+Require Import Coq.Arith.EqNat.
+Require Import Coq.omega.Omega.
+Require Import Coq.Lists.List.
+
 
 Require Import Maps.
 Require Import Util.
+
+(* Utility tactic from Smallstep.v *)
+Ltac solve_by_inverts n :=
+  match goal with | H : ?T |- _ => 
+  match type of T with Prop =>
+    solve [ 
+      inversion H; 
+      match n with S (S (?n')) => subst; solve_by_inverts (S n') end ]
+  end end.
 
 Module STLC.
 
@@ -32,7 +46,6 @@ Inductive value : term -> Prop :=
   | v_false :
       value t_false.
 Hint Constructors value.
-
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
 Fixpoint subst (x:string) (s:term) (t:term) : term :=
@@ -139,7 +152,9 @@ Inductive step : term -> term -> Prop :=
       (t_if t1 t2 t3) ==> (t_if t1' t2 t3)
   | ST_Let : forall x t1 t1' t2, t1 ==> t1' -> (t_let x t1 t2) ==> (t_let x t1' t2)
   | ST_LetValue : forall x v1 t2, value v1 -> (t_let x v1 t2) ==> [x:=v1]t2
-  | ST_Fix1 : forall t1 t1', t_fix t1 ==> t_fix t1'
+  | ST_Fix1 : forall t1 t1', 
+      t1 ==> t1' ->
+      t_fix t1 ==> t_fix t1'
   | ST_FixAbs : forall x T t1, t_fix (t_abs x T t1) ==> [x:=t_fix(t_abs x T t1)]t1
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
@@ -212,6 +227,14 @@ Proof.
   exists x. exists t0.  auto.
 Qed.
 
+Theorem value_cannot_step : forall t t', value t -> t ==> t' -> False.
+Proof.
+  intros. 
+  - inversion H. rewrite <- H1 in H0. inversion H0.
+    + rewrite <- H1 in H0. inversion H0.
+    + rewrite <- H1 in H0. inversion H0.
+Qed.
+
 (** A well-typed term can always take a smallstep if it is not a value *)  
 Theorem progress : forall t T,
   empty |- t \in T ->
@@ -219,12 +242,11 @@ Theorem progress : forall t T,
 Proof with eauto.
   intros t T Ht.
   remember (@empty ty) as Gamma.
-  induction Ht; subst Gamma.
+  induction Ht; subst Gamma...
   - (* T_Var *)
     (* contradictory: variables cannot be typed in an
        empty context *)
     inversion H.
-  - auto.
   - (* T_App *)
     (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a
        value or steps... *)
@@ -240,8 +262,6 @@ Proof with eauto.
         inversion H0 as [t2' Hstp]. exists (t_app t1 t2')...
     + (* t1 steps *)
       inversion H as [t1' Hstp]. exists (t_app t1' t2)...
-  - auto.
-  - auto.
   - (* T_If *)
     right. destruct IHHt1...
     + (* t1 is a value *)
@@ -250,9 +270,11 @@ Proof with eauto.
       inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
   - (* T_Let *)
     right. destruct IHHt1... destruct H. exists (t_let x x0 t2). apply ST_Let. apply H.
-  - 
-    right. destruct IHHt...
-Qed. 
+  - (* T_Fix *)
+    right. destruct IHHt... 
+    inversion H; subst; try solve_by_inverts Ht...
+    + inversion H...
+Qed.
 
 (** Defines that a variable appears free in a term. *)  
 Inductive appears_free_in : string -> term -> Prop :=
@@ -376,7 +398,6 @@ Lemma substitution_preserves_typing : forall Gamma x U t v T,
 Proof with eauto.
   intros Gamma x U t v T H H1.
   generalize dependent Gamma. generalize dependent T.
-  
   induction t; intros T Gamma H; inversion H; subst; simpl...
   - destruct (string_beqP x s).
     + subst. assert (Gamma & { s --> U} |- t_var s \in U). {
@@ -428,15 +449,12 @@ Proof with eauto.
       * apply IHHT1. reflexivity. apply H3.
       * apply HT2.
     + eapply substitution_preserves_typing. apply HT2. apply HT1.
-  - (* T_Fix *)
-    inversion HT...
-    + subst. eapply substitution_preserves_typing. 
-    eapply substitution_preserves_typing with T1.
-
-    inversion HE.
-    + eapply T_Fix. 
-      * apply IHHT. reflexivity. 
-      * 
+  -  (* T_Fix *) 
+    inversion HE; subst...
+    + 
+    inversion HE; subst... 
+    + inversion HT. subst. simpl.
+    rewrite <- T_Fix.
 Qed.
 
 (** A normal form i a term that cannot step any further *)
