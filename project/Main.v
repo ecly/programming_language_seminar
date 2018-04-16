@@ -9,7 +9,9 @@ Module STLC.
 
 Inductive ty : Type  :=
   | TBool  : ty
-  | TArrow : ty -> ty -> ty.
+  | TArrow : ty -> ty -> ty
+  | TRNil : ty (* Empty record *)
+  | TRCons : string -> ty -> ty -> ty (* Extend record *).
 
 Inductive term : Type :=
   | t_var : string -> term
@@ -18,10 +20,34 @@ Inductive term : Type :=
   | t_true : term
   | t_false : term
   | t_if : term -> term -> term -> term
-  | t_let : string -> term -> term -> term. (* let x:T = term in term *)
+  | t_let : string -> term -> term -> term (* let x:T = term in term *)
+  | t_proj : term -> string -> term (* Field access on a record *)
+  | t_rnil : term (* Empty record *)
+  | t_rcons : string -> term -> term -> term (* Extend record *). 
 
 (* Needed for string definitions *)  
 Open Scope string_scope.
+
+(* Whether a type is a record type. *)
+Inductive record_ty : ty -> Prop :=
+  | RT_Nil : record_ty TRNil
+  | RT_Cons : forall f T1 T2, record_ty (TRCons f T1 T2).
+Hint Constructors record_ty.
+
+(* Whether a type makes sense. 
+   For example adding a record field to something that is not a record does not. *)
+Inductive well_formed_ty : ty -> Prop :=
+  | WFT_bool : well_formed_ty TBool
+  | WFT_arrow : forall T1 T2, well_formed_ty T1 -> well_formed_ty T2 -> well_formed_ty (TArrow T1 T2)
+  | WFT_trnil : well_formed_ty TRNil
+  | WFT_trcons : forall s T1 T2,
+      well_formed_ty T1 -> well_formed_ty T2 -> record_ty T2 -> well_formed_ty (TRCons s T1 T2).
+Hint Constructors well_formed_ty.
+
+(* Whether a term is a record *)
+Inductive record_term : term -> Prop :=
+  | rt_nil : record_term t_rnil
+  | rt_cons : forall f t1 t2, record_term (t_rcons f t1 t2).
 
 Inductive value : term -> Prop :=
   | v_abs : forall x T t,
@@ -29,7 +55,9 @@ Inductive value : term -> Prop :=
   | v_true :
       value t_true
   | v_false :
-      value t_false.
+      value t_false
+  | v_rnil : value t_rnil
+  | v_rcons : forall f t1 t2, value t1 -> value t2 -> value (t_rcons f t1 t2).
 Hint Constructors value.
 
 
@@ -50,6 +78,9 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
       t_if ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
   | t_let x' t1 t2 => 
       t_let x' ([x:=s] t1) (if string_beq x x' then t2 else ([x:=s] t2))
+  | t_proj t f => t_proj ([x:=s] t) f
+  | t_rnil => t_rnil
+  | t_rcons f t t_rst => t_rcons f ([x:=s] t) ([x:=s] t_rst)
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
@@ -69,7 +100,11 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_let_eq : forall t1 t1' t2, subst_ind x s t1 t1' ->
       subst_ind x s (t_let x t1 t2) (t_let x t1' t2)
   | subst_let_neq : forall x' t1 t1' t2 t2', x <> x' -> subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
-      subst_ind x s (t_let x' t1 t2) (t_let x' t1' t2').
+      subst_ind x s (t_let x' t1 t2) (t_let x' t1' t2')
+  | subst_proj : forall f t t', subst_ind x s t t' -> subst_ind x s (t_proj t f) (t_proj t' f)
+  | subst_rnil : subst_ind x s t_rnil t_rnil
+  | subst_rcons : forall f t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' -> 
+      subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2').
 Hint Constructors subst_ind.
  
 Theorem subst_ind_correct : forall x s t t',
@@ -77,21 +112,21 @@ Theorem subst_ind_correct : forall x s t t',
 Proof.
   split.
   - generalize dependent x. generalize dependent s. generalize dependent t'.
-    induction t as [x'| |x'| | | |x']; intros t' s x H; simpl in H.
+    induction t as [x'| |x'| | | |x'|t IHt x'| |x']; intros t' s x H; simpl in H; subst.
     + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_var_eq.
-      * rewrite <- H. apply subst_var_neq. apply string_beq_false_iff. apply res.
-    + subst. apply subst_app.
+      * apply subst_var_neq. apply string_beq_false_iff. apply res.
+    + apply subst_app.
       * apply IHt1. reflexivity.
       * apply IHt2. reflexivity.
     + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_abs_eq.
-      * rewrite <- H. rewrite string_beq_false_iff in res. apply subst_abs_neq. 
+      * rewrite string_beq_false_iff in res. apply subst_abs_neq. 
         assumption. apply IHt. reflexivity.
-    + rewrite <- H. apply subst_true.
-    + rewrite <- H. apply subst_false.
-    + rewrite <- H. apply subst_if; auto.
-    + rewrite <- H. destruct (string_beq x x') eqn:res.
+    + apply subst_true.
+    + apply subst_false.
+    + apply subst_if; auto.
+    + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_let_eq. apply IHt1. reflexivity.
       * rewrite string_beq_false_iff in res. {
         apply subst_let_neq. 
@@ -99,18 +134,26 @@ Proof.
         - apply IHt1. reflexivity.
         - apply IHt2. reflexivity.
       } 
-  - intros H. induction H; simpl.
+    + apply subst_proj. apply IHt. reflexivity.
+    + apply subst_rnil.
+    + apply subst_rcons.
+      * apply IHt1. reflexivity.
+      * apply IHt2. reflexivity.
+  - intros H. induction H; simpl; subst; try reflexivity.
     + rewrite string_beq_refl. reflexivity.
     + rewrite (string_beq_false x x' H). reflexivity.
-    + subst. reflexivity.
     + rewrite string_beq_refl. reflexivity.
-    + subst. rewrite (string_beq_false x x' H). reflexivity.
-    + reflexivity.
-    + reflexivity.
-    + subst. reflexivity.
-    + subst. rewrite string_beq_refl. reflexivity.
-    + subst. rewrite (string_beq_false x x' H). reflexivity.
+    + rewrite (string_beq_false x x' H). reflexivity.
+    + rewrite string_beq_refl. reflexivity.
+    + rewrite (string_beq_false x x' H). reflexivity.
 Qed.
+
+(* Lookup a field in a record *)
+Fixpoint trlookup f tr :=
+  match tr with
+  | t_rcons f' t tr' => if string_beq f f' then Some t else trlookup f tr'
+  | _ => None
+  end.
 
 Reserved Notation "t1 '==>' t2" (at level 40).
 Inductive step : term -> term -> Prop :=
@@ -133,6 +176,11 @@ Inductive step : term -> term -> Prop :=
       (t_if t1 t2 t3) ==> (t_if t1' t2 t3)
   | ST_Let : forall x t1 t1' t2, t1 ==> t1' -> (t_let x t1 t2) ==> (t_let x t1' t2)
   | ST_LetValue : forall x v1 t2, value v1 -> (t_let x v1 t2) ==> [x:=v1]t2
+  | ST_Proj : forall t t' f, t ==> t' -> (t_proj t f) ==> (t_proj t' f)
+  | ST_ProjValue : forall r f v, value r -> trlookup f r = Some v -> (t_proj r f) ==> v 
+  | ST_RecordHead : forall t t' trest f, t ==> t' -> (t_rcons f t trest) ==> (t_rcons f t' trest)
+  | ST_RecordTail : forall v f trest trest', value v -> trest ==> trest' -> 
+      t_rcons f v trest ==> t_rcons f v trest'
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 
@@ -152,12 +200,33 @@ Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 (** Typing *)
 Definition context := partial_map ty.
 
+(* Lookup the type of a field in a record *)
+Fixpoint TRlookup f tr :=
+  match tr with
+  | TRCons f' T Trest => if string_beq f f' then Some T else TRlookup f Trest
+  | _ => None
+  end.
+  
+(* If a record type is well formed, all contained values are as well *)
+Lemma wellformed_record_lookup : forall f T Tf,
+  well_formed_ty T ->
+  TRlookup f T = Some Tf ->
+  well_formed_ty Tf.
+Proof.
+  intros f T. induction T; intros; try easy.
+  inversion H. subst. unfold TRlookup in H0.
+  destruct (string_beq f s); try eauto.
+  inversion H0. subst. apply H4.
+Qed.
+
 Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
 Inductive has_type : context -> term -> ty -> Prop :=
   | T_Var : forall Gamma x T,
       Gamma x = Some T ->
+      well_formed_ty T ->
       Gamma |- t_var x \in T
   | T_Abs : forall Gamma x T11 T12 t12,
+      well_formed_ty T11 ->
       Gamma & {x --> T11} |- t12 \in T12 ->
       Gamma |- t_abs x T11 t12 \in TArrow T11 T12
   | T_App : forall T11 T12 Gamma t1 t2,
@@ -165,22 +234,41 @@ Inductive has_type : context -> term -> ty -> Prop :=
       Gamma |- t2 \in T11 ->
       Gamma |- t_app t1 t2 \in T12
   | T_True : forall Gamma,
-       Gamma |- t_true \in TBool
+      Gamma |- t_true \in TBool
   | T_False : forall Gamma,
-       Gamma |- t_false \in TBool
+      Gamma |- t_false \in TBool
   | T_If : forall t1 t2 t3 T Gamma,
-       Gamma |- t1 \in TBool ->
-       Gamma |- t2 \in T ->
-       Gamma |- t3 \in T ->
-       Gamma |- t_if t1 t2 t3 \in T
+      Gamma |- t1 \in TBool ->
+      Gamma |- t2 \in T ->
+      Gamma |- t3 \in T ->
+      Gamma |- t_if t1 t2 t3 \in T
   | T_Let : forall Gamma x t1 T1 t2 T,
-        Gamma |- t1 \in T1 ->
-        Gamma & {x --> T1} |- t2 \in T ->
-        Gamma |- t_let x t1 t2 \in T
-
+      Gamma |- t1 \in T1 ->
+      Gamma & {x --> T1} |- t2 \in T ->
+      Gamma |- t_let x t1 t2 \in T
+  | T_Proj : forall Gamma t f TR T,
+      Gamma |- t \in TR ->
+      TRlookup f TR = Some T ->
+      Gamma |- t_proj t f \in T
+  | T_RNil : forall Gamma,
+      Gamma |- t_rnil \in TRNil
+  | T_RCons : forall Gamma f t tr T Trest ,
+      Gamma |- t \in T ->
+      Gamma |- tr \in Trest ->
+      record_ty Trest ->
+      record_term tr ->
+      Gamma |- t_rcons f t tr \in TRCons f T Trest
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
 Hint Constructors has_type.
 
+(* If has_type t T, then T is well formed *)
+Lemma has_type_wellformed : forall Gamma t T, Gamma |- t \in T -> well_formed_ty T.
+Proof.
+  intros. induction H; try eauto.
+  - inversion IHhas_type1. assumption.
+  - eapply wellformed_record_lookup. apply IHhas_type. apply H0.
+Qed.
+    
 (** Lemmas stating the canonical form of boolean and arrow types *)
 Lemma canonical_forms_bool : forall t,
   empty |- t \in TBool ->
@@ -199,6 +287,32 @@ Proof.
   intros t T1 T2 HT HVal.
   inversion HVal; intros; subst; try inversion HT; subst; auto.
   exists x. exists t0.  auto.
+Qed.
+
+Lemma step_preserves_record_term : forall t t',
+  record_term t ->
+  t ==> t' ->
+  record_term t'.
+Proof.
+  intros. inversion H; subst.
+  - inversion H0.
+  - inversion H0; subst; apply rt_cons.
+Qed.
+
+(* If looking up a field in a record type returns a type, then looking up a field in a record gives
+   a value of that type. *)
+Lemma lookup_matches : forall v f T Tf,
+  value v ->
+  empty |- v \in T ->
+  TRlookup f T = Some Tf ->
+  exists t, trlookup f v = Some t /\ empty |- t \in Tf.
+Proof.
+  intros v f T Ti Hval Htyp Hget.
+  remember (@empty ty) as Gamma.
+  induction Htyp; subst; try easy.
+  - simpl in Hget. simpl. destruct (string_beq f f0).
+    + simpl. inversion Hget. subst. exists t. eauto.
+    + destruct IHHtyp2 as [vi [Hgeti Htypi]]; eauto. inversion Hval. eauto.
 Qed.
 
 (** A well-typed term can always take a smallstep if it is not a value *)  
@@ -236,6 +350,17 @@ Proof with eauto.
       inversion H as [t1' Hstp]. exists (t_if t1' t2 t3)...
   - (* T_Let *)
     right. destruct IHHt1... destruct H. exists (t_let x x0 t2). apply ST_Let. apply H.
+  - (* T_Proj *)
+    right. destruct IHHt; try easy.
+    + destruct (lookup_matches t f TR T H0 Ht H). exists x. destruct H1.
+      apply ST_ProjValue. apply H0. apply H1.
+    + destruct H0. exists (t_proj x f). apply ST_Proj. apply H0.
+  - (* T_RCons *)
+    destruct IHHt1; try easy.
+    + destruct IHHt2; try easy.
+      * left. eauto.
+      * right. destruct H2. exists (t_rcons f t x). apply ST_RecordTail; assumption.
+    + right. destruct H1. exists (t_rcons f x tr). apply ST_RecordHead. assumption. 
 Qed.
 
 (** Defines that a variable appears free in a term. *)  
@@ -267,9 +392,18 @@ Inductive appears_free_in : string -> term -> Prop :=
   | afi_let2 : forall x y t1 t2,
       y <> x ->
       appears_free_in x t2 ->
-      appears_free_in x (t_let y t1 t2). 
+      appears_free_in x (t_let y t1 t2)
+  | afi_proj : forall x t f,
+      appears_free_in x t ->
+      appears_free_in x (t_proj t f)
+  | afi_rcons_head : forall x f t tr,
+      appears_free_in x t ->
+      appears_free_in x (t_rcons f t tr)
+  | afi_rcons_tail : forall x f t tr,
+      appears_free_in x tr ->
+      appears_free_in x (t_rcons f t tr). 
 Hint Constructors appears_free_in.
-  
+
 (** A closed term is one that does not contain any free variables *)
 Definition closed (t:term) :=
   forall x, ~ appears_free_in x t.
@@ -286,8 +420,8 @@ Proof.
          intros; try solve [inversion H0; eauto].
   - (* afi_abs *)
     inversion H1; subst.
-    apply IHappears_free_in in H7.
-    rewrite partial_map_apply_neq in H7; assumption.
+    apply IHappears_free_in in H8.
+    rewrite partial_map_apply_neq in H8; assumption.
   - inversion H1; subst. apply IHappears_free_in in H8.
     rewrite partial_map_apply_neq in H8; assumption.
 Qed. 
@@ -312,9 +446,9 @@ Proof with eauto.
   generalize dependent Gamma'.
   induction H; intros; auto.
   - (* T_Var *)
-    apply T_Var. rewrite <- H0...
+    apply T_Var. rewrite <- H1; eauto. assumption.
   - (* T_Abs *)
-    apply T_Abs.
+    apply T_Abs. apply H.
     apply IHhas_type. intros x1 Hafi.
     (* the only tricky step... the [Gamma'] we use to
        instantiate is [Gamma & {{x-->T11}}] *)
@@ -329,22 +463,31 @@ Proof with eauto.
       * rewrite string_beq_true_iff in res. subst. repeat rewrite partial_map_apply_eq. reflexivity.
       * rewrite string_beq_false_iff in res. repeat rewrite partial_map_apply_neq; try assumption.
         apply H1. apply afi_let2; assumption.
+  - (* T_Proj *)
+    eapply T_Proj; eauto.
 Qed.
 
-(** If a term has one time, it cannot have another *)
+(** If a term has one type, it cannot have another *)
 Lemma type_unique : forall t T U Gamma, Gamma |- t \in T -> Gamma |- t \in U -> T = U.
 Proof.
   induction t; intros; inversion H; inversion H0; subst.
-  - rewrite H3 in H7. inversion H7. reflexivity.
+  - rewrite H2 in H7. inversion H7. reflexivity.
   - assert (T11 = T0). { eapply IHt2. apply H6. apply H12. } subst. 
     assert (TArrow T0 T = TArrow T0 U). { eapply IHt1. apply H4. apply H10. }
     inversion H1. reflexivity.
-  - assert (T12 = T1). { eapply IHt. apply H6. apply H12. } subst. reflexivity.
+  - assert (T12 = T1). { eapply IHt. apply H7. apply H14. } subst. reflexivity.
   - reflexivity.
   - reflexivity.
   - eapply IHt2. apply H7. apply H15.
   - (* T_Let *) assert (T1 = T2). { eapply IHt1. apply H6. apply H13. } subst.
     eapply IHt2. apply H7. apply H14.
+  - (* T_Proj *) assert (TR = TR0). { eapply IHt. apply H4. apply H10. } subst.
+    rewrite H6 in H12. inversion H12. reflexivity.
+  - (* T_RNil *) reflexivity.
+  - (* T_RCons *)
+    assert (Trest = Trest0). { eapply IHt2. apply H6. apply H15. }
+    assert (T0 = T1). { eapply IHt1. apply H4. apply H13. }
+    subst. reflexivity.  
 Qed.
 
 (** If a variable has a type U in the context of t, t can be substituted by a value of type U. *)
@@ -359,17 +502,19 @@ Proof with eauto.
   induction t; intros T Gamma H; inversion H; subst; simpl...
   - destruct (string_beqP x s).
     + subst. assert (Gamma & { s --> U} |- t_var s \in U). {
-        apply T_Var. apply partial_map_apply_eq.
+        apply T_Var.
+        - apply partial_map_apply_eq.
+        - eapply has_type_wellformed. apply H1.
       }
       assert (T = U). { eapply type_unique. apply H. apply H0. } subst.
       eapply context_invariance in H1. apply H1. intros. apply typable_empty_closed in H1.
-      unfold closed in H1. destruct (H1 x). apply H2.
-    + apply T_Var. rewrite partial_map_apply_neq in H3; assumption.
+      unfold closed in H1. destruct (H1 x). apply H3.
+    + apply T_Var; eauto. rewrite partial_map_apply_neq in H2; assumption.
   - (* tabs *)
-    rename s into y. rename t into T. apply T_Abs.
+    rename s into y. rename t into T. apply T_Abs; try assumption.
     destruct (string_beqP x y) as [Hxy | Hxy].
     + (* x=y *)
-      subst. rewrite partial_map_update_shadow in H6. apply H6.
+      subst. rewrite partial_map_update_shadow in H7. apply H7.
     + (* x<>y *)
       apply IHt. eapply context_invariance...
       intros z Hafi. unfold update.
@@ -381,6 +526,10 @@ Proof with eauto.
     + destruct (string_beqP x s).
       * subst. rewrite partial_map_update_shadow in H7. apply H7.
       * apply IHt2. rewrite partial_map_update_permute; assumption.
+  - (* t_rcons *) apply T_RCons; eauto.
+    inversion H9.
+      + simpl. apply rt_nil.
+      + simpl. apply rt_cons.
 Qed.
 
 (** Taking a step preserves the type *)
@@ -407,8 +556,19 @@ Proof with eauto.
       * apply IHHT1. reflexivity. apply H3.
       * apply HT2.
     + eapply substitution_preserves_typing. apply HT2. apply HT1.
+  - (* T_Proj *)
+    (*assert (empty |- t_proj t f \in T). { eapply T_Proj. apply HT. apply H. }*)
+    inversion HE; subst.
+    + assert (empty |- t_proj t'0 f \in T). {
+        eapply T_Proj. apply IHHT. reflexivity. apply H3. apply H.
+      } apply H0.
+    + destruct (lookup_matches t f TR T H2 HT H). destruct H0.
+      assert (Some t' = Some x). { rewrite <- H4. rewrite <- H0. reflexivity. }
+      inversion H3. subst. apply H1.
+  - (* T_RCons *) inversion HE; subst; apply T_RCons; eauto.
+    eapply step_preserves_record_term. apply H0. apply H6.
 Qed.
-
+    
 (** A normal form i a term that cannot step any further *)
 Definition normal_form t : Prop := ~exists t', t ==> t'.
 
