@@ -23,7 +23,8 @@ Inductive term : Type :=
   | t_let : string -> term -> term -> term (* let x:T = term in term *)
   | t_proj : term -> string -> term (* Field access on a record *)
   | t_rnil : term (* Empty record *)
-  | t_rcons : string -> term -> term -> term (* Extend record *). 
+  | t_rcons : string -> term -> term -> term (* Extend record *)
+  | t_fix : term -> term.
 
 (* Needed for string definitions *)  
 Open Scope string_scope.
@@ -81,6 +82,8 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
   | t_proj t f => t_proj ([x:=s] t) f
   | t_rnil => t_rnil
   | t_rcons f t t_rst => t_rcons f ([x:=s] t) ([x:=s] t_rst)
+  | t_fix t1 => 
+      t_fix (subst x s t1)
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
@@ -104,7 +107,8 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_proj : forall f t t', subst_ind x s t t' -> subst_ind x s (t_proj t f) (t_proj t' f)
   | subst_rnil : subst_ind x s t_rnil t_rnil
   | subst_rcons : forall f t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' -> 
-      subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2').
+      subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2')
+  | subst_fix : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_fix t1) (t_fix t1').
 Hint Constructors subst_ind.
  
 Theorem subst_ind_correct : forall x s t t',
@@ -112,7 +116,7 @@ Theorem subst_ind_correct : forall x s t t',
 Proof.
   split.
   - generalize dependent x. generalize dependent s. generalize dependent t'.
-    induction t as [x'| |x'| | | |x'|t IHt x'| |x']; intros t' s x H; simpl in H; subst.
+    induction t as [x'| |x'| | | |x'|t IHt x'| |x'|x']; intros t' s x H; simpl in H; subst.
     + destruct (string_beq x x') eqn:res.
       * rewrite string_beq_true_iff in res. subst. apply subst_var_eq.
       * apply subst_var_neq. apply string_beq_false_iff. apply res.
@@ -139,6 +143,7 @@ Proof.
     + apply subst_rcons.
       * apply IHt1. reflexivity.
       * apply IHt2. reflexivity.
+    + apply subst_fix. apply IHx'. reflexivity.  
   - intros H. induction H; simpl; subst; try reflexivity.
     + rewrite string_beq_refl. reflexivity.
     + rewrite (string_beq_false x x' H). reflexivity.
@@ -181,6 +186,8 @@ Inductive step : term -> term -> Prop :=
   | ST_RecordHead : forall t t' trest f, t ==> t' -> (t_rcons f t trest) ==> (t_rcons f t' trest)
   | ST_RecordTail : forall v f trest trest', value v -> trest ==> trest' -> 
       t_rcons f v trest ==> t_rcons f v trest'
+  | ST_Fix1 : forall t1 t1', t1 ==> t1' -> t_fix t1 ==> t_fix t1'
+  | ST_FixAbs : forall x T t1, t_fix (t_abs x T t1) ==> [x:=t_fix(t_abs x T t1)]t1
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 
@@ -258,6 +265,10 @@ Inductive has_type : context -> term -> ty -> Prop :=
       record_ty Trest ->
       record_term tr ->
       Gamma |- t_rcons f t tr \in TRCons f T Trest
+  | T_Fix : forall Gamma t1 T1,
+      Gamma |- t1 \in TArrow T1 T1 ->
+      Gamma |- t_fix t1 \in T1
+
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
 Hint Constructors has_type.
 
@@ -267,6 +278,7 @@ Proof.
   intros. induction H; try eauto.
   - inversion IHhas_type1. assumption.
   - eapply wellformed_record_lookup. apply IHhas_type. apply H0.
+  - inversion IHhas_type. apply H2.
 Qed.
     
 (** Lemmas stating the canonical form of boolean and arrow types *)
@@ -322,11 +334,12 @@ Theorem progress : forall t T,
 Proof with eauto.
   intros t T Ht.
   remember (@empty ty) as Gamma.
-  induction Ht; subst Gamma...
+  induction Ht; subst Gamma.
   - (* T_Var *)
     (* contradictory: variables cannot be typed in an
        empty context *)
     inversion H.
+  - auto.
   - (* T_App *)
     (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a
        value or steps... *)
@@ -342,6 +355,8 @@ Proof with eauto.
         inversion H0 as [t2' Hstp]. exists (t_app t1 t2')...
     + (* t1 steps *)
       inversion H as [t1' Hstp]. exists (t_app t1' t2)...
+  - auto.
+  - auto.
   - (* T_If *)
     right. destruct IHHt1...
     + (* t1 is a value *)
@@ -355,13 +370,18 @@ Proof with eauto.
     + destruct (lookup_matches t f TR T H0 Ht H). exists x. destruct H1.
       apply ST_ProjValue. apply H0. apply H1.
     + destruct H0. exists (t_proj x f). apply ST_Proj. apply H0.
+  - (* T_RNil *) left. constructor.
   - (* T_RCons *)
     destruct IHHt1; try easy.
     + destruct IHHt2; try easy.
       * left. eauto.
       * right. destruct H2. exists (t_rcons f t x). apply ST_RecordTail; assumption.
     + right. destruct H1. exists (t_rcons f x tr). apply ST_RecordHead. assumption. 
-Qed.
+  - (* T_Fix *)
+    right. destruct IHHt...
+    inversion H; subst; try easy...
+    inversion H...
+Qed. 
 
 (** Defines that a variable appears free in a term. *)  
 Inductive appears_free_in : string -> term -> Prop :=
@@ -401,7 +421,10 @@ Inductive appears_free_in : string -> term -> Prop :=
       appears_free_in x (t_rcons f t tr)
   | afi_rcons_tail : forall x f t tr,
       appears_free_in x tr ->
-      appears_free_in x (t_rcons f t tr). 
+      appears_free_in x (t_rcons f t tr)
+  | afi_fix : forall x t1,
+      appears_free_in x t1 ->
+      appears_free_in x (t_fix t1).
 Hint Constructors appears_free_in.
 
 (** A closed term is one that does not contain any free variables *)
@@ -487,7 +510,9 @@ Proof.
   - (* T_RCons *)
     assert (Trest = Trest0). { eapply IHt2. apply H6. apply H15. }
     assert (T0 = T1). { eapply IHt1. apply H4. apply H13. }
-    subst. reflexivity.  
+    subst. reflexivity.
+  - (* T_Fix *) assert (TArrow T T = TArrow U U). {eapply IHt. apply H3. apply H7. }
+    inversion H1. reflexivity.
 Qed.
 
 (** If a variable has a type U in the context of t, t can be substituted by a value of type U. *)
@@ -557,7 +582,6 @@ Proof with eauto.
       * apply HT2.
     + eapply substitution_preserves_typing. apply HT2. apply HT1.
   - (* T_Proj *)
-    (*assert (empty |- t_proj t f \in T). { eapply T_Proj. apply HT. apply H. }*)
     inversion HE; subst.
     + assert (empty |- t_proj t'0 f \in T). {
         eapply T_Proj. apply IHHT. reflexivity. apply H3. apply H.
@@ -567,6 +591,11 @@ Proof with eauto.
       inversion H3. subst. apply H1.
   - (* T_RCons *) inversion HE; subst; apply T_RCons; eauto.
     eapply step_preserves_record_term. apply H0. apply H6.
+  -  (* T_Fix *) 
+    inversion HE; subst; eauto.
+    + inversion HT. subst. eapply substitution_preserves_typing.
+      * apply H6.
+      * apply T_Fix. apply HT.
 Qed.
     
 (** A normal form i a term that cannot step any further *)
