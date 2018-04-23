@@ -125,7 +125,7 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_rcons : forall f t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' -> 
       subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2')
   | subst_fix : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_fix t1) (t_fix t1')
-  | subst_nat : forall n, subst_ind x s n n
+  | subst_nat : forall n, subst_ind x s (t_nat n) (t_nat n)
   | subst_succ : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_succ t1) (t_succ t1')
   | subst_pred : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_pred t1) (t_pred t1')
   | subst_mult : forall t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
@@ -178,8 +178,7 @@ Proof.
     + rewrite (string_beq_false x x' H). reflexivity.
     + rewrite string_beq_refl. reflexivity.
     + rewrite (string_beq_false x x' H). reflexivity.
-    + Set Printing All. unfold subst. 
-Admitted.
+Qed.
 
 (* Lookup a field in a record *)
 Fixpoint trlookup f tr :=
