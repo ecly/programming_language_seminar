@@ -12,6 +12,7 @@ Inductive ty : Type  :=
   | TArrow : ty -> ty -> ty
   | TRNil : ty (* Empty record *)
   | TRCons : string -> ty -> ty -> ty (* Extend record *)
+  | TNat : ty
   | TSNil : ty (* Empty sum *)
   | TSCons : string -> ty -> ty -> ty (* Extend sum *).
 
@@ -27,6 +28,11 @@ Inductive term : Type :=
   | t_rnil : term (* Empty record *)
   | t_rcons : string -> term -> term -> term (* Extend record *)
   | t_fix : term -> term
+  (* numbers *)
+  | t_nat : nat -> term
+  | t_succ : term -> term
+  | t_pred : term -> term
+  | t_mult : term -> term -> term
   | t_sum : string -> term -> ty -> term (* Create a sum type, needs type annotation *)
   | t_match : term -> case_list -> term (* Match sum type cases. Each term is a function. *)
   (* Cases cannot be in term, as we then have both valid and invalid untyped terms *)
@@ -59,6 +65,7 @@ Inductive well_formed_ty : ty -> Prop :=
   | WFT_trnil : well_formed_ty TRNil
   | WFT_trcons : forall s T1 T2,
       well_formed_ty T1 -> well_formed_ty T2 -> record_ty T2 -> well_formed_ty (TRCons s T1 T2)
+  | WFT_nat : well_formed_ty TNat
   | WFT_tsnil : well_formed_ty TSNil
   | WFT_tscons : forall s T1 T2,
       well_formed_ty T1 -> well_formed_ty T2 -> sum_ty T2 -> well_formed_ty (TSCons s T1 T2).
@@ -78,6 +85,8 @@ Inductive value : term -> Prop :=
       value t_false
   | v_rnil : value t_rnil
   | v_rcons : forall f t1 t2, value t1 -> value t2 -> value (t_rcons f t1 t2)
+  | v_nat : forall n1,
+      value (t_nat n1)
   | v_sum : forall s v T, value v -> value (t_sum s v T).
 Hint Constructors value.
 
@@ -103,6 +112,14 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
   | t_rcons f t t_rst => t_rcons f ([x:=s] t) ([x:=s] t_rst)
   | t_fix t1 => 
       t_fix (subst x s t1)
+  | t_nat n =>
+      t_nat n
+  | t_succ t1 =>
+      t_succ (subst x s t1)
+  | t_pred t1 =>
+      t_pred (subst x s t1)
+  | t_mult t1 t2 =>
+      t_mult (subst x s t1) (subst x s t2)
   | t_sum x' t T => t_sum x' ([x:=s] t) T
   | t_match t hs => t_match ([x:=s]t) (subst_cases x s hs)
   end
@@ -134,6 +151,11 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
   | subst_rcons : forall f t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' -> 
       subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2')
   | subst_fix : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_fix t1) (t_fix t1')
+  | subst_nat : forall n, subst_ind x s (t_nat n) (t_nat n)
+  | subst_succ : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_succ t1) (t_succ t1')
+  | subst_pred : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_pred t1) (t_pred t1')
+  | subst_mult : forall t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
+    subst_ind x s (t_mult t1 t2) (t_mult t1' t2')
   | subst_sum : forall x' t t' T, subst_ind x s t t' -> 
       subst_ind x s (t_sum x' t T) (t_sum x' t' T)
   | subst_match : forall t t' hs hs',
@@ -189,6 +211,12 @@ Proof.
       * apply IHt1. reflexivity.
       * apply IHt2. reflexivity.
     + apply subst_fix. apply IHt. reflexivity.  
+    + apply subst_nat. 
+    + apply subst_succ. apply IHt. reflexivity.
+    + apply subst_pred. apply IHt. reflexivity.
+    + apply subst_mult. 
+      * apply IHt1. reflexivity.
+      * apply IHt2. reflexivity.
     + apply subst_sum. apply IHt. reflexivity.
     + apply subst_match.
       * apply IHt. reflexivity.
@@ -201,7 +229,7 @@ Proof.
     (P := fun t t' H => [x := s] t = t')
     (P0 := fun hs hs' H => subst_cases x s hs = hs');
     simpl; subst; try reflexivity.
-    + rewrite string_beq_refl. reflexivity.
+  + rewrite string_beq_refl. reflexivity.
     + rewrite string_beq_false. reflexivity. assumption.
     + rewrite string_beq_refl. reflexivity.
     + rewrite string_beq_false. subst. reflexivity. assumption.
@@ -244,6 +272,23 @@ Inductive step : term -> term -> Prop :=
       t_rcons f v trest ==> t_rcons f v trest'
   | ST_Fix1 : forall t1 t1', t1 ==> t1' -> t_fix t1 ==> t_fix t1'
   | ST_FixAbs : forall x T t1, t_fix (t_abs x T t1) ==> [x:=t_fix(t_abs x T t1)]t1
+  | ST_Succ1 : forall t1 t1',
+      t1 ==> t1' -> (t_succ t1) ==> (t_succ t1')
+  | ST_SuccNat : forall n1,
+      (t_succ (t_nat n1)) ==> (t_nat (S n1))
+  | ST_Pred1 : forall t1 t1',
+      t1 ==> t1' -> (t_pred t1) ==> (t_pred t1')
+  | ST_PredNat : forall n1,
+      (t_pred (t_nat n1)) ==> (t_nat (pred n1))
+  | ST_Mult1 : forall t1 t1' t2,
+       t1 ==> t1' ->
+       (t_mult t1 t2) ==> (t_mult t1' t2)
+  | ST_Mult2 : forall v1 t2 t2',
+       value v1 ->
+       t2 ==> t2' ->
+       (t_mult v1 t2) ==> (t_mult v1 t2')
+  | ST_MultNats : forall n1 n2,
+       (t_mult (t_nat n1) (t_nat n2)) ==> (t_nat (mult n1 n2))
   | ST_Sum : forall x t t' T, t ==> t' -> t_sum x t T ==> t_sum x t' T
   | ST_Match : forall t t' hs, t ==> t' -> t_match t hs ==> t_match t' hs
   | ST_MatchSumOne : forall x t t' T, t_match (t_sum x t T) (t_case_one x t') ==> t_app t' t
@@ -332,6 +377,18 @@ Inductive has_type : context -> term -> ty -> Prop :=
   | T_Fix : forall Gamma t1 T1,
       Gamma |- t1 \in TArrow T1 T1 ->
       Gamma |- t_fix t1 \in T1
+  | T_Nat : forall Gamma n1,
+      Gamma |- (t_nat n1) \in TNat
+  | T_Succ : forall Gamma t1,
+      Gamma |- t1 \in TNat ->
+      Gamma |- (t_succ t1) \in TNat
+  | T_Pred : forall Gamma t1,
+      Gamma |- t1 \in TNat ->
+      Gamma |- (t_pred t1) \in TNat
+  | T_Mult : forall Gamma t1 t2,
+      Gamma |- t1 \in TNat ->
+      Gamma |- t2 \in TNat ->
+      Gamma |- (t_mult t1 t2) \in TNat
   | T_SumEq : forall Gamma t T T2 x,
       Gamma |- t \in T ->
       sum_ty T2 ->
@@ -487,6 +544,21 @@ Proof with eauto.
     right. destruct IHHt...
     inversion H; subst; try easy...
     inversion H...
+  - left. auto.
+  - right. destruct IHHt... inversion H; subst; try easy.
+    + exists (t_nat (S n1))...
+    + inversion H. exists (t_succ x)...
+  - right. destruct IHHt... inversion H; subst; try easy.
+    + exists (t_nat (pred n1))...
+    + inversion H. exists (t_pred x)...
+  - right. destruct IHHt1... 
+    + destruct IHHt2...
+      * inversion H; subst; try easy. 
+        inversion H0; subst; try easy.
+        { exists (t_nat (mult n1 n0))... }
+      * inversion H0. subst; try easy.
+        { exists (t_mult t1 x)... }
+    + inversion H. exists (t_mult x t2)...
   - (* T_SumEq *)
     destruct IHHt; try reflexivity.
     + left. constructor. assumption.
@@ -560,6 +632,19 @@ Inductive appears_free_in : string -> term -> Prop :=
   | afi_fix : forall x t1,
       appears_free_in x t1 ->
       appears_free_in x (t_fix t1)
+  (* nats *)
+  | afi_succ : forall x t,
+     appears_free_in x t ->
+     appears_free_in x (t_succ t)
+  | afi_pred : forall x t,
+     appears_free_in x t ->
+     appears_free_in x (t_pred t)
+  | afi_mult1 : forall x t1 t2,
+     appears_free_in x t1 ->
+     appears_free_in x (t_mult t1 t2)
+  | afi_mult2 : forall x t1 t2,
+     appears_free_in x t2 ->
+     appears_free_in x (t_mult t1 t2)
   | afi_sum : forall x x' t T, appears_free_in x t -> appears_free_in x (t_sum x' t T)
   | afi_match_t : forall x t hs, appears_free_in x t -> appears_free_in x (t_match t hs)
   | afi_match_hs : forall x t hs, appears_free_in_case_list x hs -> appears_free_in x (t_match t hs)
@@ -689,6 +774,10 @@ Proof.
     subst. reflexivity.
   - (* T_Fix *) assert (TArrow T T = TArrow U U). {eapply IHt. apply H3. apply H7. }
     inversion H1. reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
   - inversion H11. subst. reflexivity.
   - inversion H11. subst. reflexivity.
   - inversion H11. subst. reflexivity.
