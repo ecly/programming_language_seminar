@@ -42,9 +42,6 @@ with case_list : Type :=
 Scheme term_ind_rec := Induction for term Sort Set
 with case_list_ind_rec := Induction for case_list Sort Set.
 
-(* Needed for string definitions *)  
-Open Scope string_scope.
-
 (* Whether a type is a record type. *)
 Inductive record_ty : ty -> Prop :=
   | RT_Nil : record_ty TRNil
