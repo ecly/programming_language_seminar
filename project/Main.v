@@ -1,6 +1,7 @@
 Set Warnings "-notation-overridden".
 
 Require Import Coq.Strings.String.
+Require Import Coq.Arith.EqNat.
 
 Require Import Maps.
 Require Import Util.
@@ -30,6 +31,7 @@ Inductive term : Type :=
   | t_fix : term -> term
   (* numbers *)
   | t_nat : nat -> term
+  | t_nat_eq : term -> term -> term
   | t_succ : term -> term
   | t_pred : term -> term
   | t_mult : term -> term -> term
@@ -111,6 +113,8 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
       t_fix (subst x s t1)
   | t_nat n =>
       t_nat n
+  | t_nat_eq n1 n2 =>
+      t_nat_eq ([x:=s]n1) ([x:=s]n2)
   | t_succ t1 =>
       t_succ (subst x s t1)
   | t_pred t1 =>
@@ -149,6 +153,10 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
       subst_ind x s (t_rcons f t1 t2) (t_rcons f t1' t2')
   | subst_fix : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_fix t1) (t_fix t1')
   | subst_nat : forall n, subst_ind x s (t_nat n) (t_nat n)
+  | subst_nat_eq : forall n1 n1' n2 n2',
+      subst_ind x s n1 n1' ->
+      subst_ind x s n2 n2' ->
+      subst_ind x s (t_nat_eq n1 n2) (t_nat_eq n1' n2') 
   | subst_succ : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_succ t1) (t_succ t1')
   | subst_pred : forall t1 t1', subst_ind x s t1 t1' -> subst_ind x s (t_pred t1) (t_pred t1')
   | subst_mult : forall t1 t1' t2 t2', subst_ind x s t1 t1' -> subst_ind x s t2 t2' ->
@@ -209,6 +217,9 @@ Proof.
       * apply IHt2. reflexivity.
     + apply subst_fix. apply IHt. reflexivity.  
     + apply subst_nat. 
+    + apply subst_nat_eq.
+      * apply IHt1. reflexivity.
+      * apply IHt2. reflexivity.
     + apply subst_succ. apply IHt. reflexivity.
     + apply subst_pred. apply IHt. reflexivity.
     + apply subst_mult. 
@@ -269,6 +280,18 @@ Inductive step : term -> term -> Prop :=
       t_rcons f v trest ==> t_rcons f v trest'
   | ST_Fix1 : forall t1 t1', t1 ==> t1' -> t_fix t1 ==> t_fix t1'
   | ST_FixAbs : forall x T t1, t_fix (t_abs x T t1) ==> [x:=t_fix(t_abs x T t1)]t1
+  | ST_Nat_Eq1 : forall n1 n1' n2,
+      n1 ==> n1' ->
+      t_nat_eq n1 n2 ==> t_nat_eq n1' n2  
+  | ST_Nat_Eq2 : forall n1 n2 n2',
+      value n1 ->
+      n2 ==> n2' ->
+      t_nat_eq n1 n2 ==> t_nat_eq n1 n2'
+  | ST_Nat_EqTrue : forall n,
+      t_nat_eq (t_nat n) (t_nat n) ==> t_true
+  | ST_Nat_EqFalse : forall n1 n2,
+      n1 <> n2 ->
+      t_nat_eq (t_nat n1) (t_nat n2) ==> t_false
   | ST_Succ1 : forall t1 t1',
       t1 ==> t1' -> (t_succ t1) ==> (t_succ t1')
   | ST_SuccNat : forall n1,
@@ -376,6 +399,10 @@ Inductive has_type : context -> term -> ty -> Prop :=
       Gamma |- t_fix t1 \in T1
   | T_Nat : forall Gamma n1,
       Gamma |- (t_nat n1) \in TNat
+  | T_Nat_Eq : forall Gamma n1 n2,
+      Gamma |- n1 \in TNat ->
+      Gamma |- n2 \in TNat ->
+      Gamma |- (t_nat_eq n1 n2) \in TBool
   | T_Succ : forall Gamma t1,
       Gamma |- t1 \in TNat ->
       Gamma |- (t_succ t1) \in TNat
@@ -542,6 +569,17 @@ Proof with eauto.
     inversion H; subst; try easy...
     inversion H...
   - left. auto.
+  - right. destruct IHHt1; try reflexivity.
+    + destruct IHHt2; try reflexivity.
+      * {
+        inversion H; subst; try easy.
+        inversion H0; subst; try easy.
+        destruct (beq_nat n0 n1) eqn:res.
+        - apply beq_nat_true in res. subst. exists t_true. constructor.
+        - apply beq_nat_false in res. exists t_false. constructor. assumption.
+        }
+      * destruct H0. exists (t_nat_eq n1 x). apply ST_Nat_Eq2; assumption.
+    + destruct H. exists (t_nat_eq x n2). apply ST_Nat_Eq1; assumption.
   - right. destruct IHHt... inversion H; subst; try easy.
     + exists (t_nat (S n1))...
     + inversion H. exists (t_succ x)...
@@ -630,6 +668,12 @@ Inductive appears_free_in : string -> term -> Prop :=
       appears_free_in x t1 ->
       appears_free_in x (t_fix t1)
   (* nats *)
+  | afi_nat_eq1 : forall x n1 n2,
+      appears_free_in x n1 ->
+      appears_free_in x (t_nat_eq n1 n2)
+  | afi_nat_eq2 : forall x n1 n2,
+      appears_free_in x n2 ->
+      appears_free_in x (t_nat_eq n1 n2)
   | afi_succ : forall x t,
      appears_free_in x t ->
      appears_free_in x (t_succ t)
@@ -775,10 +819,11 @@ Proof.
   - reflexivity.
   - reflexivity.
   - reflexivity.
-  - inversion H11. subst. reflexivity.
-  - inversion H11. subst. reflexivity.
-  - inversion H11. subst. reflexivity.
-  - inversion H11. subst. reflexivity.
+  - reflexivity.
+  - inversion H0; subst; reflexivity.
+  - inversion H0; subst; reflexivity.
+  - inversion H0; subst; reflexivity.
+  - inversion H0; subst; reflexivity.
   - eapply IHt0. 
     + apply H6. 
     + assert (TSCons x T' TR = TSCons x0 T'0 TR0). { eapply IHt. apply H4. apply H10. } 
