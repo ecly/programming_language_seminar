@@ -4,7 +4,15 @@ Require Import Maps.
 Require Import Util.
 Require Import Main.
 
+(* !!! NOTE !!! *)
+(* This file contains proofs that were done during the earlier
+phases of the Stlc adaptation. As such, these proofs are no longer
+valid as there are new types, constructors and more that are not handled. *)
+
 Import STLC.
+Open Scope string_scope.
+Notation x := "x".
+Notation y := "y".
 
 Notation idB :=
   (t_abs x TBool (t_var x)).

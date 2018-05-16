@@ -6,6 +6,8 @@ Require Import Main.
 
 Import STLC.
 
+(* Small examples of adding notation to the Stlc adaptation. *)
+
 (* Normalize tactics for easy example proofs with multi_step. *)
 Tactic Notation "print_goal" :=
   match goal with |- ?x => idtac x end.

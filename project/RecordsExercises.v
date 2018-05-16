@@ -3,6 +3,7 @@ Require Import Maps.
 Require Import Util.
 Import STLC.
 
+Open Scope string_scope.
 Notation a := "a".
 Notation i1 := "i1".
 Notation i2 := "i2".
