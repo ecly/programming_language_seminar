@@ -66,3 +66,37 @@ Proof.
     + eapply ST_AppAbs. apply v_true.
     + simpl. apply multi_refl.
 Qed.
+
+Definition product :=
+  t_fix
+    (t_abs "f" (TArrow (TList TNat) (TNat))
+      (t_abs "x" (TList TNat)
+        (t_match (t_var "x") 
+          (t_case_cons "cons"
+            (t_abs "l" (TRCons "head" TNat (TRCons "tail" (TList TNat) TRNil))
+              (t_mult (t_proj (t_var "l") "head") (t_app (t_var "f") (t_proj (t_var "l") "tail"))))
+          (t_case_one "nil" (t_abs "_" TRNil (t_nat 1))))))).
+
+Example list_test :
+  t_app product (t_lcons (t_nat 3) (t_lcons (t_nat 7) (t_lnil TNat))) ==>* t_nat 21.
+Proof.
+  unfold product.
+  eapply multi_step. auto.
+  eapply multi_step. apply ST_AppAbs. auto.
+  eapply multi_step. simpl. auto.
+  eapply multi_step. apply ST_AppAbs. auto.
+  eapply multi_step. apply ST_Mult1. { simpl. apply ST_ProjValue. auto. easy. }
+  simpl. eapply multi_step. apply ST_Mult2. auto. auto.
+  simpl. eapply multi_step. apply ST_Mult2. auto.
+    { apply ST_App2. auto. apply ST_ProjValue. auto. easy. }
+  eapply multi_step. apply ST_Mult2. auto. { apply ST_AppAbs. auto. }
+  simpl. eapply multi_step. apply ST_Mult2. auto. { apply ST_MatchListCons. auto. }
+  eapply multi_step. apply ST_Mult2. auto. { apply ST_AppAbs. auto. }
+  simpl. eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult1. apply ST_ProjValue. auto. easy. }
+  eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult2. auto. auto. }
+  simpl. eapply multi_step. apply ST_Mult2. auto.
+    { apply ST_Mult2. auto. apply ST_App2. auto. apply ST_ProjValue. auto. easy. } 
+  eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult2. auto. auto. }
+  simpl. eapply multi_step. auto.
+  normalize.
+Qed.
