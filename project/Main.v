@@ -15,7 +15,8 @@ Inductive ty : Type  :=
   | TRCons : string -> ty -> ty -> ty (* Extend record *)
   | TNat : ty
   | TSNil : ty (* Empty sum *)
-  | TSCons : string -> ty -> ty -> ty (* Extend sum *).
+  | TSCons : string -> ty -> ty -> ty (* Extend sum *)
+  | TList : ty -> ty.
 
 Inductive term : Type :=
   | t_var : string -> term
@@ -37,6 +38,8 @@ Inductive term : Type :=
   | t_mult : term -> term -> term
   | t_sum : string -> term -> ty -> term (* Create a sum type, needs type annotation *)
   | t_match : term -> case_list -> term (* Match sum type cases. Each term is a function. *)
+  | t_lnil : ty -> term
+  | t_lcons : term -> term -> term
   (* Cases cannot be in term, as we then have both valid and invalid untyped terms *)
 with case_list : Type :=
   | t_case_one : string -> term -> case_list
@@ -67,13 +70,16 @@ Inductive well_formed_ty : ty -> Prop :=
   | WFT_nat : well_formed_ty TNat
   | WFT_tsnil : well_formed_ty TSNil
   | WFT_tscons : forall s T1 T2,
-      well_formed_ty T1 -> well_formed_ty T2 -> sum_ty T2 -> well_formed_ty (TSCons s T1 T2).
+      well_formed_ty T1 -> well_formed_ty T2 -> sum_ty T2 -> well_formed_ty (TSCons s T1 T2)
+  | WFT_list : forall T,
+      well_formed_ty T -> well_formed_ty (TList T).
 Hint Constructors well_formed_ty.
 
 (* Whether a term is a record *)
 Inductive record_term : term -> Prop :=
   | rt_nil : record_term t_rnil
   | rt_cons : forall f t1 t2, record_term (t_rcons f t1 t2).
+Hint Constructors record_term.
 
 Inductive value : term -> Prop :=
   | v_abs : forall x T t,
@@ -86,7 +92,10 @@ Inductive value : term -> Prop :=
   | v_rcons : forall f t1 t2, value t1 -> value t2 -> value (t_rcons f t1 t2)
   | v_nat : forall n1,
       value (t_nat n1)
-  | v_sum : forall s v T, value v -> value (t_sum s v T).
+  | v_sum : forall s v T, value v -> value (t_sum s v T)
+  | v_tnil : forall T, value (t_lnil T)
+  (* A list is a value, if its head is a value (Lazy evaluation) *)
+  | v_tcons : forall h t, value h -> value (t_lcons h t).
 Hint Constructors value.
 
 Reserved Notation "'[' x ':=' s ']' t" (at level 20).
@@ -123,6 +132,8 @@ Fixpoint subst (x:string) (s:term) (t:term) : term :=
       t_mult (subst x s t1) (subst x s t2)
   | t_sum x' t T => t_sum x' ([x:=s] t) T
   | t_match t hs => t_match ([x:=s]t) (subst_cases x s hs)
+  | t_lnil T => t_lnil T
+  | t_lcons t ts => t_lcons ([x:=s]t) ([x:=s]ts)
   end
 with subst_cases x s cases :=
   match cases with
@@ -167,6 +178,11 @@ Inductive subst_ind (x:string) (s:term) : term -> term -> Prop :=
       subst_ind x s t t' ->
       subst_case_ind x s hs hs' ->
       subst_ind x s (t_match t hs) (t_match t' hs')
+  | subst_lnil : forall T, subst_ind x s (t_lnil T) (t_lnil T)
+  | subst_lcons : forall t t' ts ts',
+    subst_ind x s t t' ->
+    subst_ind x s ts ts' ->
+    subst_ind x s (t_lcons t ts) (t_lcons t' ts')
 with subst_case_ind (x:string) (s:term) : case_list -> case_list -> Prop :=
   | subst_case_one : forall x' h h',
       subst_ind x s h h' ->
@@ -229,6 +245,10 @@ Proof.
     + apply subst_match.
       * apply IHt. reflexivity.
       * apply IHt0. reflexivity.
+    + apply subst_lnil.
+    + apply subst_lcons.
+      * apply IHt1. reflexivity.
+      * apply IHt2. reflexivity.
     + apply subst_case_one. apply IHt. reflexivity.
     + apply subst_case_cons.
       * apply IHt. reflexivity.
@@ -317,6 +337,16 @@ Inductive step : term -> term -> Prop :=
       x <> x' ->
       t_match (t_sum x t TS) hs ==> t_app t' t ->
       t_match (t_sum x t (TSCons x' T TS)) (t_case_cons x' t'' hs) ==> t_app t' t
+  | ST_ListHead : forall t t' ts,
+      t ==> t' ->
+      t_lcons t ts ==> t_lcons t' ts
+  (* A tail-stepping version is not given, which makes lists lazy. 
+     Lists can only be used through matches, which only require the head to be evaluated *)
+  | ST_MatchListNil : forall T h h', 
+      t_match (t_lnil T) (t_case_cons "cons" h (t_case_one "nil" h')) ==> t_app h' t_rnil
+  | ST_MatchListCons : forall t ts h h',
+      value t ->
+      t_match (t_lcons t ts) (t_case_cons "cons" h (t_case_one "nil" h')) ==> t_app h (t_rcons "head" t (t_rcons "tail" ts t_rnil))
 where "t1 '==>' t2" := (step t1 t2).
 Hint Constructors step.
 
@@ -427,6 +457,19 @@ Inductive has_type : context -> term -> ty -> Prop :=
   | T_Match : forall Gamma x t hs T T' TR,
       Gamma |- t \in TSCons x T' TR ->
       match_has_type Gamma (TSCons x T' TR) hs T ->
+      Gamma |- t_match t hs \in T
+  | T_LNil : forall Gamma T,
+      well_formed_ty T ->
+      Gamma |- t_lnil T \in TList T
+  | T_LCons : forall Gamma t ts T,
+      Gamma |- t \in T ->
+      Gamma |- ts \in TList T ->
+      Gamma |- t_lcons t ts \in TList T
+   | T_LMatch : forall Gamma t hs T U,
+      Gamma |- t \in TList U ->
+      match_has_type Gamma 
+        (TSCons "cons" (TRCons "head" U (TRCons "tail" (TList U) TRNil)) (TSCons "nil" TRNil TSNil))
+        hs T ->
       Gamma |- t_match t hs \in T
 (* Whether a match on a sum type has the given type *)
 with match_has_type : context -> ty -> case_list -> ty -> Prop :=
@@ -616,6 +659,24 @@ Proof with eauto.
         - exists (t_app x1 t0). apply H0.
         }
     + destruct H. exists (t_match x0 hs). constructor. assumption.
+  - left. constructor.
+  - destruct IHHt1; try reflexivity.
+    + left. constructor. assumption.
+    + right. destruct H. exists (t_lcons x ts). constructor. assumption.
+  - destruct IHHt; try reflexivity.
+    + right. inversion Ht; subst; try easy.
+      * {
+        inversion m; subst. inversion H8; subst.
+        - exists (t_app t0 t_rnil). constructor.
+        - inversion H10.
+      }
+      * {
+        inversion m; subst. inversion H9; subst.
+        - exists (t_app t (t_rcons "head" t0 (t_rcons "tail" ts t_rnil))).
+          constructor. inversion H. assumption.
+        - inversion H11.
+      }
+    + right. destruct H. exists (t_match x hs). constructor. assumption.
   - intros. inversion H; subst.
     + exists t. apply ST_MatchSumOne.
     + inversion H5.
@@ -689,6 +750,10 @@ Inductive appears_free_in : string -> term -> Prop :=
   | afi_sum : forall x x' t T, appears_free_in x t -> appears_free_in x (t_sum x' t T)
   | afi_match_t : forall x t hs, appears_free_in x t -> appears_free_in x (t_match t hs)
   | afi_match_hs : forall x t hs, appears_free_in_case_list x hs -> appears_free_in x (t_match t hs)
+  | afi_list_head : forall x t ts,
+      appears_free_in x t -> appears_free_in x (t_lcons t ts)
+  | afi_list_tail : forall x t ts,
+      appears_free_in x ts -> appears_free_in x (t_lcons t ts)
 with appears_free_in_case_list : string -> case_list -> Prop :=
   | afi_cl_one : forall x x' h, appears_free_in x h -> appears_free_in_case_list x (t_case_one x' h)
   | afi_cl_cons_head : forall x x' h hs,
@@ -729,8 +794,12 @@ Proof.
     inversion H0; subst.
     + eapply IHappears_free_in. apply H5.
     + apply sum_val_has_type in H5. destruct H5. eapply IHappears_free_in. apply H1.
-  - (* afi_match_hs_one *) 
-    inversion H; subst. eapply IHappears_free_in. apply H5.
+  - (* afi_match *) 
+    inversion H; subst. 
+    + eapply IHappears_free_in. apply H5.
+    + inversion H5; subst. inversion H9; subst.
+      * eapply IHappears_free_in. apply H5.
+      * eapply IHappears_free_in. apply H5.
   - inversion H; subst. eapply IHappears_free_in. apply H7.
 Qed. 
 
@@ -782,6 +851,9 @@ Proof with eauto.
   - eapply T_Match.
     + apply IHhas_type. intros. apply H0. apply afi_match_t. assumption.
     + apply IHhas_type0. intros. apply H0. apply afi_match_hs. assumption.
+  - eapply T_LMatch.
+    + apply IHhas_type. intros. apply H0. apply afi_match_t. assumption.
+    + apply IHhas_type0. intros. apply H0. apply afi_match_hs. assumption. 
   - apply T_CaseOne. apply IHhas_type. intros. apply H0. apply afi_cl_one. assumption.
   - apply T_CaseCons. apply IHhas_type. intros.
     + apply H0. apply afi_cl_cons_head. assumption.
@@ -828,6 +900,12 @@ Proof.
     + apply H6. 
     + assert (TSCons x T' TR = TSCons x0 T'0 TR0). { eapply IHt. apply H4. apply H10. } 
       inversion H1; subst. apply H12.
+  - assert (TSCons x T' TR = TList U0). { eapply IHt. apply H4. apply H10. } inversion H1.
+  - assert (TSCons x T' TR = TList U0). { eapply IHt. apply H10. apply H4. } inversion H1.
+  - assert (TList U0 = TList U1). { eapply IHt. apply H4. apply H10. } inversion H1. subst.
+    eapply IHt0. apply H6. apply H12.
+  - reflexivity.
+  - assert (T0 = T1). eapply IHt1. apply H4. apply H10. subst. reflexivity.
   - assert (TArrow T'0 T = TArrow T'1 U). { eapply IHt. apply H6. apply H12. } inversion H1. reflexivity.
   - assert (TArrow T'0 T = TArrow T'1 U). { eapply IHt. apply H7. apply H15. } inversion H1. reflexivity.
 Qed.
@@ -957,6 +1035,14 @@ Proof with eauto.
     + inversion m; subst. eapply T_App. apply H7. inversion HT; subst. apply H4. contradiction.
     + inversion HT; subst. contradiction.
       eapply IHHT0; eauto. eapply step_implies_case_exists. apply HE.
+    + inversion HT.
+    + inversion HT.
+  - inversion HE; subst; try easy.
+    + eapply T_LMatch.
+      * apply IHHT; auto.
+      * apply m.
+    + inversion m; subst. inversion H7; subst. eapply T_App. apply H4. apply T_RNil.
+    + inversion m; subst. eapply T_App. apply H7. inversion HT; subst. apply T_RCons; auto.
   - inversion H2. inversion H0; subst.
     + eapply T_App. rewrite string_beq_refl in H4. inversion H4. subst.
       apply HT. apply H8.
