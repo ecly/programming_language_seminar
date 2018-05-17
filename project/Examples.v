@@ -53,10 +53,10 @@ Definition Either a b :=
   TSCons "Left" a (TSCons "Right" b TSNil).
 
 Example either_test:
-  t_match 
-    (t_sum "Right" t_true (Either TNat TBool)) 
-    (t_case_cons "Left" 
-      (t_abs "x"  TNat (t_var "x")) 
+  t_match
+    (t_sum "Right" t_true (Either TNat TBool))
+    (t_case_cons "Left"
+      (t_abs "x"  TNat (t_var "x"))
       (t_case_one "Right" (t_abs "x" TBool (t_nat 0))))
         ==>* t_nat 0.
 Proof.
@@ -71,21 +71,21 @@ Definition product :=
   t_fix
     (t_abs "f" (TArrow (TList TNat) (TNat))
       (t_abs "x" (TList TNat)
-        (t_match (t_var "x") 
+        (t_match (t_var "x")
           (t_case_cons "cons"
-            (t_abs "l" 
-              (TRCons "head" TNat 
+            (t_abs "l"
+              (TRCons "head" TNat
               	(TRCons "tail" (TList TNat) TRNil))
-              (t_mult 
-              	(t_proj (t_var "l") "head") 
-                (t_app 
-                  (t_var "f") 
+              (t_mult
+              	(t_proj (t_var "l") "head")
+                (t_app
+                  (t_var "f")
                   (t_proj (t_var "l") "tail"))))
           (t_case_one "nil" (t_abs "_" TRNil (t_nat 1))))))).
 
-Example list_test :
-  t_app product (t_lcons (t_nat 3) 
-    (t_lcons (t_nat 7) (t_lnil TNat))) 
+Example product_test :
+  t_app product (t_lcons (t_nat 3)
+    (t_lcons (t_nat 7) (t_lnil TNat)))
       ==>* t_nat 21.
 Proof.
   unfold product.
@@ -103,7 +103,7 @@ Proof.
   simpl. eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult1. apply ST_ProjValue. auto. easy. }
   eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult2. auto. auto. }
   simpl. eapply multi_step. apply ST_Mult2. auto.
-    { apply ST_Mult2. auto. apply ST_App2. auto. apply ST_ProjValue. auto. easy. } 
+    { apply ST_Mult2. auto. apply ST_App2. auto. apply ST_ProjValue. auto. easy. }
   eapply multi_step. apply ST_Mult2. auto. { apply ST_Mult2. auto. auto. }
   simpl. eapply multi_step. auto.
   normalize.
