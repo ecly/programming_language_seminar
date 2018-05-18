@@ -15,35 +15,16 @@ Tactic Notation "normalize" :=
             [ (eauto 10; fail) | (instantiate; simpl)]);
 apply multi_refl.
 
-Open Scope string_scope.
-Notation x := "x".
-Notation y := "y".
-Notation a := "a".
-Notation f := "f".
-Notation g := "g".
-Notation l := "l".
-Notation k := "k".
-Notation i1 := "i1".
-Notation i2 := "i2".
-Notation processSum := "processSum".
-Notation n := "n".
-Notation eq := "eq".
-Notation m := "m".
-Notation evenodd := "evenodd".
-Notation even := "even".
-Notation odd := "odd".
-Notation eo := "eo".
-
 Definition fact :=
   t_fix
-    (t_abs f (TArrow TNat TNat)
+    (t_abs "f" (TArrow TNat TNat)
       (t_abs "x" TNat
         (t_if
           (t_nat_eq (t_nat 0) (t_var "x"))
           (t_nat 1)
           (t_mult
             (t_var "x")
-            (t_app (t_var f) (t_pred (t_var "x"))))))).
+            (t_app (t_var "f") (t_pred (t_var "x"))))))).
 
 Example fact_test:
   (t_app fact (t_nat 4)) ==>* (t_nat 24).
